@@ -1,0 +1,40 @@
+import * as s from "../core/validation/index.js";
+import type { Schema } from "../core/validation/schema.js";
+import { decisionRuleType1Schema, type DecisionRuleType1 } from "./decision-rule-type1.js";
+import { frozen1Schema, type Frozen1 } from "./frozen1.js";
+import { inactive1Schema, type Inactive1 } from "./inactive1.js";
+
+export type DecisionRulesPostRequest = {
+  /** The identifier of the Decision that this Decision Rule applies. */
+  decision: string;
+  /**
+   * The name of this Decision Rule. This field is stored as a text string and must be between 0 and
+   * 100 characters long.
+   */
+  name?: string;
+  /** Description of the Decision Rules. */
+  description?: string;
+  type: DecisionRuleType1;
+  /** The value to compare against when evaluating this Decision Rule. */
+  value: number;
+  /**
+   * A name for a group of rules to be applied in conjunction when evaluating this Decision Rule;
+   * When grouping is used, the Decision will be allowed to be processed if at least one of the
+   * rules are matched.
+   */
+  grouping?: string;
+  inactive?: Inactive1;
+  frozen?: Frozen1;
+};
+
+export const decisionRulesPostRequestSchema: Schema<DecisionRulesPostRequest> =
+  s.object<DecisionRulesPostRequest>({
+    decision: s.string(),
+    name: s.optional(s.string()),
+    description: s.optional(s.string()),
+    type: decisionRuleType1Schema,
+    value: s.number(),
+    grouping: s.optional(s.string()),
+    inactive: s.optional(s.lazy(() => inactive1Schema)),
+    frozen: s.optional(s.lazy(() => frozen1Schema)),
+  });
