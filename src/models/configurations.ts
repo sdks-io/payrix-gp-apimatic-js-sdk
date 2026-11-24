@@ -1,20 +1,37 @@
 import * as s from "../core/validation/index.js";
-import type { Schema } from "../core/validation/schema.js";
+import type { JsonValue, Schema } from "../core/validation/schema.js";
 
 export type Configurations = {
   /**
-   * duration refers to How many minutes this key should live (automated voided when tried to use
-   * after expired).
+   * This is a unique identifier that ensures all merchants processing the same card can reference a
+   * single, shared fingerprint. This shared value allows merchants or partners to consistently
+   * recognize the same cardholder across different merchants or partners. It enables cross merchant
+   * cardholder identification for reporting, matching, and any use case where multiple merchants
+   * need to identify and match the same cardholder using a single fingerprint value.
    */
-  duration?: number;
-  /** maxTimesApproved refers to how many approved transactions related it can be used. */
-  maxTimesApproved?: number;
-  /** maxTimesUse refers to how many times we can make request with this key. */
-  maxTimesUse?: number;
+  fingerprintId?: string;
+  /** Properties the service sent or accepts beyond those declared. */
+  additionalProperties?: Record<string, JsonValue>;
 };
 
-export const configurationsSchema: Schema<Configurations> = s.object<Configurations>({
-  duration: s.optional(s.number()),
-  maxTimesApproved: s.optional(s.number()),
-  maxTimesUse: s.optional(s.number()),
-});
+const configurationsProperties: s.Shape<Configurations> = {
+  fingerprintId: s.optional(s.string()),
+  _keysMap: {
+    fingerprintId: "fingerprint_id",
+  },
+};
+
+export const configurationsInternalSchema: Schema<Configurations> = s.object<Configurations>(
+  configurationsProperties,
+  { additionalProperties: s.json() },
+);
+
+export const configurationsSchema: Schema<Configurations> = s.lazySchema(() =>
+  s.object<Configurations>(
+    {
+      ...configurationsProperties,
+      fingerprintId: s.optional(s.string().check(s.minLength(1), s.maxLength(40))),
+    },
+    { additionalProperties: s.json() },
+  ),
+);

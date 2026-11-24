@@ -1,32 +1,31 @@
 import * as s from "../core/validation/index.js";
-import type { Schema } from "../core/validation/schema.js";
-import { creator18Schema, type Creator18 } from "./creator18.js";
-import { entity16Schema, type Entity16 } from "./entity16.js";
+import type { JsonValue, Schema } from "../core/validation/schema.js";
 
 export type Fee = {
-  /** The ID of this resource. */
-  id?: string;
-  /**
-   * The date and time at which this resource was created. The format should be YYYY-MM-DD
-   * HH:MM:SS.SSSS
-   */
-  created?: string;
-  /**
-   * The date and time at which this resource was modified. The format should be YYYY-MM-DD
-   * HH:MM:SS.SSSS
-   */
-  modified?: string;
-  creator?: Creator18;
-  /** The identifier of the Login that last modified this resource. */
-  modifier?: string;
-  entity?: Entity16;
+  /** Name of the fee included */
+  name?: string;
+  /** Any additional fee amount merchant included. */
+  amount?: string;
+  /** Properties the service sent or accepts beyond those declared. */
+  additionalProperties?: Record<string, JsonValue>;
 };
 
-export const feeSchema: Schema<Fee> = s.object<Fee>({
-  id: s.optional(s.string()),
-  created: s.optional(s.string()),
-  modified: s.optional(s.string()),
-  creator: s.optional(s.lazy(() => creator18Schema)),
-  modifier: s.optional(s.string()),
-  entity: s.optional(s.lazy(() => entity16Schema)),
+const feeProperties: s.Shape<Fee> = {
+  name: s.optional(s.string()),
+  amount: s.optional(s.string()),
+};
+
+export const feeInternalSchema: Schema<Fee> = s.object<Fee>(feeProperties, {
+  additionalProperties: s.json(),
 });
+
+export const feeSchema: Schema<Fee> = s.lazySchema(() =>
+  s.object<Fee>(
+    {
+      ...feeProperties,
+      name: s.optional(s.string().check(s.minLength(1), s.maxLength(50))),
+      amount: s.optional(s.string().check(s.minLength(1), s.maxLength(50))),
+    },
+    { additionalProperties: s.json() },
+  ),
+);

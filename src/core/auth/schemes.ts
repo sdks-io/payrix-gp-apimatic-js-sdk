@@ -1,67 +1,91 @@
-import type { AuthParams, AuthScheme } from "../api-request.js";
-import type { BasicAuthCredentials, TokenProvider } from "./credentials.js";
-import { ConfigurationError, CoreError } from "../errors.js";
-import * as s from "../validation/index.js";
+import type { AuthParams, AuthScheme, HttpMethod, MissingCredentials } from "../api-request.js";
+import type { BasicAuthCredentials, SecretProvider } from "./credentials.js";
+import type { RequestHeaders } from "../headers.js";
+import type { RequestUrl } from "../url.js";
+import type { HttpLogger } from "../http-logger.js";
+import { AuthError, ConfigurationError, ConnectionError, TimeoutError } from "../errors.js";
 
-const NO_PARAMS: AuthParams = {};
+const NO_PARAMS: AuthParams = { headers: [], query: [], cookies: [] };
 
 export const noneAuth: AuthScheme = {
   resolve: () => NO_PARAMS,
-  hasCredentials: () => false,
+  missingCredentials: () => [],
 };
 
-export function bearerAuth(token: TokenProvider | undefined): AuthScheme {
+export function unconfiguredAuth(scheme: string): AuthScheme {
   return {
-    async resolve(signal) {
-      const value = await resolveToken(token, signal);
-      return value === undefined ? NO_PARAMS : header("Authorization", `Bearer ${value}`);
+    resolve() {
+      throw new Error(`The ${scheme} credential is not configured.`);
     },
-    hasCredentials: () => hasToken(token),
+    missingCredentials: () => [[scheme]],
   };
 }
 
-export function basicAuth(credentials: BasicAuthCredentials | undefined): AuthScheme {
-  if (credentials !== undefined && credentials.username.includes(":")) {
+export function bearerAuth(scheme: string, secret: SecretProvider | undefined): AuthScheme {
+  if (!hasSecret(secret)) return unconfiguredAuth(scheme);
+  return {
+    async resolve(signal) {
+      return header("Authorization", `Bearer ${await resolveSecret(scheme, secret, signal)}`);
+    },
+    missingCredentials: () => [],
+  };
+}
+
+export function basicAuth(scheme: string, credentials: BasicAuthCredentials | undefined): AuthScheme {
+  if (credentials === undefined) return unconfiguredAuth(scheme);
+  if (credentials.username.includes(":")) {
     throw new ConfigurationError("A basic-auth username cannot contain a colon (RFC 7617 section 2).");
   }
   return {
-    resolve() {
-      if (credentials === undefined) return NO_PARAMS;
-      return header("Authorization", basicCredential(credentials.username, credentials.password));
-    },
-    hasCredentials: () => credentials !== undefined,
+    resolve: () => header("Authorization", basicCredential(credentials.username, credentials.password)),
+    missingCredentials: () => [],
   };
 }
 
-export function apiKeyHeaderAuth(config: { name: string; token: TokenProvider | undefined }): AuthScheme {
+export function apiKeyHeaderAuth(
+  scheme: string,
+  config: { name: string; secret: SecretProvider | undefined },
+): AuthScheme {
+  if (!hasSecret(config.secret)) return unconfiguredAuth(scheme);
   return {
     async resolve(signal) {
-      const value = await resolveToken(config.token, signal);
-      return value === undefined ? NO_PARAMS : header(config.name, value);
+      return header(config.name, await resolveSecret(scheme, config.secret, signal));
     },
-    hasCredentials: () => hasToken(config.token),
+    missingCredentials: () => [],
   };
 }
 
-export function apiKeyQueryAuth(config: { name: string; token: TokenProvider | undefined }): AuthScheme {
+export function apiKeyQueryAuth(
+  scheme: string,
+  config: { name: string; secret: SecretProvider | undefined },
+): AuthScheme {
+  if (!hasSecret(config.secret)) return unconfiguredAuth(scheme);
   return {
     async resolve(signal) {
-      const value = await resolveToken(config.token, signal);
-      if (value === undefined) return NO_PARAMS;
-      return { query: [{ name: config.name, value, schema: s.string() }] };
+      return {
+        headers: [],
+        query: [[config.name, await resolveSecret(scheme, config.secret, signal)]],
+        cookies: [],
+      };
     },
-    hasCredentials: () => hasToken(config.token),
+    missingCredentials: () => [],
   };
 }
 
-export function apiKeyCookieAuth(config: { name: string; token: TokenProvider | undefined }): AuthScheme {
+export function apiKeyCookieAuth(
+  scheme: string,
+  config: { name: string; secret: SecretProvider | undefined },
+): AuthScheme {
+  if (!hasSecret(config.secret)) return unconfiguredAuth(scheme);
   return {
     async resolve(signal) {
-      const value = await resolveToken(config.token, signal);
-      if (value === undefined) return NO_PARAMS;
-      return { cookies: [{ name: config.name, value, schema: s.string() }] };
+      return {
+        headers: [],
+        query: [],
+        cookies: [[config.name, await resolveSecret(scheme, config.secret, signal)]],
+      };
     },
-    hasCredentials: () => hasToken(config.token),
+    missingCredentials: () => [],
   };
 }
 
@@ -71,15 +95,16 @@ export function allAuth(...schemes: readonly AuthScheme[]): AuthScheme {
       const parts: AuthParams[] = [];
       for (const scheme of schemes) parts.push(await scheme.resolve(signal));
       return {
-        headers: parts.flatMap((part) => part.headers ?? []),
-        query: parts.flatMap((part) => part.query ?? []),
-        cookies: parts.flatMap((part) => part.cookies ?? []),
+        headers: parts.flatMap((part) => part.headers),
+        query: parts.flatMap((part) => part.query),
+        cookies: parts.flatMap((part) => part.cookies),
       };
     },
-    hasCredentials: () => schemes.length > 0 && schemes.every((scheme) => scheme.hasCredentials()),
-    invalidate() {
-      for (const scheme of schemes) scheme.invalidate?.();
+    missingCredentials() {
+      const names = schemes.flatMap((scheme) => scheme.missingCredentials().flat());
+      return names.length === 0 ? [] : [names];
     },
+    invalidate: (rejected) => invalidateEach(schemes, rejected),
   };
 }
 
@@ -88,28 +113,83 @@ export function anyAuth(...schemes: readonly AuthScheme[]): AuthScheme {
     async resolve(signal) {
       const failures: unknown[] = [];
       for (const scheme of schemes) {
-        if (!scheme.hasCredentials()) continue;
+        if (scheme.missingCredentials().length > 0) continue;
         try {
           return await scheme.resolve(signal);
         } catch (err) {
-          if (signal?.aborted) throw signal.reason;
-          if (err instanceof CoreError && err.kind === "timeout") throw err;
+          if (signal.aborted) throw signal.reason;
+          if (err instanceof TimeoutError) throw err;
           failures.push(err);
         }
       }
-      if (failures.length === 0) return NO_PARAMS;
+      if (failures.length === 0) throw new Error("None of the accepted credentials is configured.");
       if (failures.length === 1) throw failures[0];
       throw new AggregateError(failures, "No authentication scheme succeeded.");
     },
-    hasCredentials: () => schemes.some((scheme) => scheme.hasCredentials()),
-    invalidate() {
-      for (const scheme of schemes) scheme.invalidate?.();
-    },
+    missingCredentials: () =>
+      schemes.some((scheme) => scheme.missingCredentials().length === 0)
+        ? []
+        : schemes.flatMap((scheme) => scheme.missingCredentials()),
+    invalidate: (rejected) => invalidateEach(schemes, rejected),
   };
 }
 
+export function orAnonymous(scheme: AuthScheme): AuthScheme {
+  return {
+    resolve: (signal) => (scheme.missingCredentials().length === 0 ? scheme.resolve(signal) : NO_PARAMS),
+    missingCredentials: () => [],
+    invalidate: (rejected) => scheme.invalidate?.(rejected) ?? false,
+  };
+}
+
+export type AuthenticatedRequest = {
+  readonly url: URL;
+  readonly headers: Headers;
+};
+
+export async function authenticateRequest(
+  method: HttpMethod,
+  auth: AuthScheme,
+  url: RequestUrl,
+  headers: RequestHeaders,
+  signal: AbortSignal,
+  startedAt: number,
+  logger: HttpLogger,
+): Promise<AuthenticatedRequest> {
+  const missing = auth.missingCredentials();
+  if (missing.length > 0) {
+    const { uri } = url;
+    const error = new AuthError(`${method} ${uri} failed: ${describeMissing(missing)}`, { method, uri });
+    logger.logFailure(error, startedAt);
+    throw error;
+  }
+  try {
+    const credential = await auth.resolve(signal);
+    return {
+      url: url.withQuery(credential.query),
+      headers: headers.withCredential(credential.headers, credential.cookies),
+    };
+  } catch (err) {
+    if (signal.aborted) throw signal.reason;
+    if (err instanceof ConnectionError || err instanceof TimeoutError) throw err;
+    if (err instanceof AuthError) {
+      logger.logFailure(err, startedAt);
+      throw err;
+    }
+    const { uri } = url;
+    const error = new AuthError(
+      `${method} ${uri} failed: ${
+        err instanceof Error && err.message !== "" ? err.message : "A credential could not be obtained."
+      }`,
+      { cause: err, method, uri },
+    );
+    logger.logFailure(error, startedAt);
+    throw error;
+  }
+}
+
 export function header(name: string, value: string): AuthParams {
-  return { headers: [{ name, value, schema: s.string() }] };
+  return { headers: [[name, value]], query: [], cookies: [] };
 }
 
 export function basicCredential(username: string, password: string): string {
@@ -122,17 +202,44 @@ export function base64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
-async function resolveToken(
-  token: TokenProvider | undefined,
-  signal?: AbortSignal,
-): Promise<string | undefined> {
-  return present(typeof token === "function" ? await token(signal) : token);
+async function resolveSecret(
+  scheme: string,
+  secret: SecretProvider | undefined,
+  signal: AbortSignal,
+): Promise<string> {
+  const value: unknown = typeof secret === "function" ? await secret(signal) : secret;
+  if (value !== undefined && typeof value !== "string") {
+    throw new TypeError(`A credential must be a string, received ${typeof value}.`);
+  }
+  if (value === undefined || value === "") {
+    throw new Error(`The ${scheme} credential provider returned no value.`);
+  }
+  return value;
 }
 
-function hasToken(token: TokenProvider | undefined): boolean {
-  return typeof token === "function" || present(token) !== undefined;
+function hasSecret(secret: SecretProvider | undefined): boolean {
+  return typeof secret === "function" || (secret !== undefined && secret !== "");
 }
 
-function present(value: string | undefined): string | undefined {
-  return value !== undefined && value !== "" ? value : undefined;
+function invalidateEach(schemes: readonly AuthScheme[], rejected: string | null): boolean {
+  let revocable = false;
+  for (const scheme of schemes) {
+    if (scheme.invalidate?.(rejected) === true) revocable = true;
+  }
+  return revocable;
+}
+
+function describeMissing(alternatives: MissingCredentials): string {
+  if (alternatives.length > 1) {
+    return `None of the accepted credentials is configured: ${alternatives.map(listed).join(", or ")}.`;
+  }
+  const names = alternatives[0] ?? [];
+  return names.length === 1
+    ? `The ${listed(names)} credential is not configured.`
+    : `The ${listed(names)} credentials are not configured.`;
+}
+
+function listed(names: readonly string[]): string {
+  if (names.length < 2) return names.join("");
+  return `${names.slice(0, -1).join(", ")} and ${names.slice(-1).join("")}`;
 }

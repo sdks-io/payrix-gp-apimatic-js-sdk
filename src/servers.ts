@@ -1,6 +1,7 @@
 import type { ClientOptions } from "./client-options.js";
 import type { ServerBase, UrlTemplate } from "./core/api-request.js";
 import { ConfigurationError } from "./core/errors.js";
+import { resolveBaseUrl } from "./core/url.js";
 import * as s from "./core/validation/index.js";
 
 export const ServerEnvironment = {
@@ -15,24 +16,23 @@ export type Servers = {
 };
 
 const productionSchemas = {
-  baseUrl: s.of(s.defaulted(s.string(), "https://test-api.payrix.com")),
+  baseUrl: s.of(s.defaulted(s.string(), "https://apis.globalpay.com/ucp")),
 };
 
 const environment2Schemas = {
-  baseUrl: s.of(s.defaulted(s.string(), "https://test-api.payrixcanada.com")),
+  baseUrl: s.of(s.defaulted(s.string(), "https://apis.sandbox.globalpay.com/ucp")),
 };
 
 const environment3Schemas = {
-  baseUrl: s.of(s.defaulted(s.string(), "{serverUrl}")),
-  serverUrl: s.of(s.defaulted(s.string(), "https://custom.payrix.com")),
+  baseUrl: s.of(s.defaulted(s.string(), "https://storage.googleapis.com")),
 };
 
 export function buildServers(options: ClientOptions): Servers {
   const base = {
-    default: defaultServer(options),
+    default: resolveBaseUrl(defaultServer(options)),
   };
   return {
-    default: (subPath) => ({ ...base.default, subPath }),
+    default: (subPath) => ({ baseUrl: base.default, subPath }),
   };
 }
 
@@ -45,10 +45,7 @@ function defaultServer(options: ClientOptions): ServerBase {
     case ServerEnvironment.Environment2:
       return { baseUrl: environment2Schemas.baseUrl.decode(options.serverOptions?.baseUrl) };
     case ServerEnvironment.Environment3:
-      return {
-        baseUrl: environment3Schemas.baseUrl.decode(options.serverOptions?.baseUrl),
-        variables: { serverUrl: environment3Schemas.serverUrl.decode(options.serverOptions?.serverUrl) },
-      };
+      return { baseUrl: environment3Schemas.baseUrl.decode(options.serverOptions?.baseUrl) };
     default:
       unknownEnvironment(environment);
   }

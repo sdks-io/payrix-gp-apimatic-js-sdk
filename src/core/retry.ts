@@ -1,5 +1,6 @@
 import type { HttpMethod } from "./api-request.js";
 import { ConfigurationError, type ConnectionError, type TimeoutError } from "./errors.js";
+import type { HttpLogger } from "./http-logger.js";
 import * as s from "./validation/index.js";
 import type { Schema } from "./validation/schema.js";
 
@@ -236,11 +237,11 @@ export function buildRetryOptions(
         maxRetries: s.fallback(s.int().check(s.gte(0)), fallbacks.maxRetries),
         delay: s.fallback(s.int().check(s.gte(0), s.lte(MAX_TIMEOUT_MS)), fallbacks.delay),
         backoffFactor: s.fallback(
-          s.number().check(s.gte(1), s.lte(MAX_BACKOFF_FACTOR)),
+          s.float64().check(s.gte(1), s.lte(MAX_BACKOFF_FACTOR)),
           fallbacks.backoffFactor,
         ),
         useExponentialBackoff: s.fallback(s.boolean(), fallbacks.useExponentialBackoff),
-        maxJitter: s.fallback(s.number().check(s.gte(0), s.lte(1)), fallbacks.maxJitter),
+        maxJitter: s.fallback(s.float64().check(s.gte(0), s.lte(1)), fallbacks.maxJitter),
         onRetry: s.fallback(s.callback<(attempt: RetryAttempt) => void>(), fallbacks.onRetry),
       }),
       fallbacks,
@@ -313,6 +314,7 @@ export type RespondedAttempt = {
   readonly kind: "response";
   readonly response: Response;
   readonly isStreaming: boolean;
+  readonly reauthenticate: boolean;
   discard(): void;
 };
 
@@ -325,24 +327,41 @@ export type FaultedAttempt = {
 export class RetryPolicy {
   readonly #options: ResolvedRetryOptions;
 
-  constructor(options: ResolvedRetryOptions) {
-    this.#options = options;
-  }
-
-  get timeout(): number {
-    return this.#options.timeout;
+  constructor(retry: RetryOptions | undefined, fallbacks: ResolvedRetryOptions) {
+    this.#options = buildRetryOptions(retry, fallbacks);
   }
 
   async execute(
     method: HttpMethod,
-    callerSignal: AbortSignal | undefined,
-    send: () => Promise<RespondedAttempt | FaultedAttempt>,
+    callerSignal: AbortSignal,
+    startedAt: number,
+    logger: HttpLogger,
+    send: (timeout: number) => Promise<RespondedAttempt | FaultedAttempt>,
   ): Promise<Response> {
-    for (let attemptNumber = 0; ; attemptNumber += 1) {
-      const attempt = await send();
-      if (!shouldRetry(this.#options, attemptNumber, method, attempt)) {
-        if (attempt.kind === "fault") throw attempt.error;
-        return attempt.response;
+    let retriesMade = 0;
+    let reauthenticated = false;
+    for (;;) {
+      const attempt = await send(this.#options.timeout);
+      if (!shouldRetry(this.#options, retriesMade, method, attempt)) {
+        if (attempt.kind === "fault") {
+          logger.logFailure(attempt.error, startedAt);
+          throw attempt.error;
+        }
+        if (!attempt.reauthenticate || reauthenticated) return attempt.response;
+
+        reauthenticated = true;
+        attempt.discard();
+        if (callerSignal.aborted) throw callerSignal.reason;
+        logger.logRetry(
+          {
+            attemptNumber: 1,
+            delay: 0,
+            reason: { kind: "status", status: attempt.response.status, headers: attempt.response.headers },
+          },
+          1,
+        );
+        retriesMade = 0;
+        continue;
       }
       let reason: RetryReason;
       switch (attempt.kind) {
@@ -354,27 +373,24 @@ export class RetryPolicy {
           reason = { kind: "fault", error: attempt.error };
           break;
       }
-      await waitBeforeRetry(this.#options, attemptNumber, reason, callerSignal);
+      if (callerSignal.aborted) throw callerSignal.reason;
+      const retry: RetryAttempt = {
+        attemptNumber: retriesMade + 1,
+        delay: retryDelayMs(this.#options, retriesMade, reason),
+        reason,
+      };
+      logger.logRetry(retry, this.#options.maxRetries);
+      this.#options.onRetry?.(retry);
+      await sleep(retry.delay, callerSignal);
+      if (callerSignal.aborted) throw callerSignal.reason;
+      retriesMade += 1;
     }
   }
 }
 
-async function waitBeforeRetry(
-  options: ResolvedRetryOptions,
-  attempt: number,
-  reason: RetryReason,
-  callerSignal: AbortSignal | undefined,
-): Promise<void> {
-  if (callerSignal?.aborted) throw callerSignal.reason;
+function retryDelayMs(options: ResolvedRetryOptions, retriesMade: number, reason: RetryReason): number {
   const hint = reason.kind === "status" ? delayFromRetryAfterHeader(reason.headers, Date.now()) : undefined;
-  const delay = retryDelayMs(options, attempt, hint);
-  options.onRetry?.({ attemptNumber: attempt + 1, delay, reason });
-  await sleep(delay, callerSignal);
-  if (callerSignal?.aborted) throw callerSignal.reason;
-}
-
-function retryDelayMs(options: ResolvedRetryOptions, attempt: number, hint: number | undefined): number {
-  const growth = options.useExponentialBackoff ? options.backoffFactor ** attempt : 1;
+  const growth = options.useExponentialBackoff ? options.backoffFactor ** retriesMade : 1;
   const delay = Math.min(Math.max(hint ?? options.delay * growth, 0), MAX_DELAY_MS);
   return Math.ceil(delay * (1 + Math.random() * options.maxJitter));
 }
@@ -405,14 +421,14 @@ function delayFromRetryAfterHeader(headers: Headers, now: number): number | unde
   return Number.isNaN(date) ? undefined : date - now;
 }
 
-function sleep(ms: number, signal?: AbortSignal): Promise<void> {
-  if (signal?.aborted) return Promise.resolve();
+function sleep(ms: number, signal: AbortSignal): Promise<void> {
+  if (signal.aborted) return Promise.resolve();
   return new Promise<void>((resolve) => {
     const timer = setTimeout(done, ms);
-    signal?.addEventListener("abort", done);
+    signal.addEventListener("abort", done);
     function done(): void {
       clearTimeout(timer);
-      signal?.removeEventListener("abort", done);
+      signal.removeEventListener("abort", done);
       resolve();
     }
   });

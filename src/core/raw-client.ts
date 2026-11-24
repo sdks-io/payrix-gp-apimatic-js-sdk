@@ -1,175 +1,222 @@
 import type { ApiRequest, HttpMethod, RequestOptions, RawClientOptions } from "./api-request.js";
-import { AuthError, CoreError, ConnectionError, DecodeError, EncodeError, TimeoutError } from "./errors.js";
-import { decodeErrorPayload, type AnyApiError, type ResponseHandler } from "./api-error.js";
-import { decodeResponse } from "./response-decoder.js";
+import { CoreError, ConnectionError, TimeoutError } from "./errors.js";
+import type { ApiError } from "./api-error.js";
+import { ResponseReader, type ResponseHandler } from "./response-decoder.js";
 import { ApiPromise, type RequestOutcome } from "./api-promise.js";
-import { buildBody, type BodyContent } from "./request-body.js";
-import { buildRetryOptions, RetryPolicy } from "./retry.js";
-import { applyQuery, resolveUri, templateUri } from "./url.js";
-import { buildHeaders } from "./headers.js";
-import { queryString } from "./params.js";
-import * as s from "./validation/index.js";
-import { SchemaError } from "./validation/schema-error.js";
+import { Pageable } from "./pagination/pageable.js";
+import type { PagingState } from "./pagination/states/paging-state.js";
+import { buildBody } from "./request-body.js";
+import { RetryPolicy } from "./retry.js";
+import { UrlBuilder } from "./url.js";
+import { HeadersBuilder } from "./headers.js";
+import { HttpLogger } from "./http-logger.js";
+import { HookRunner } from "./hooks.js";
+import { authenticateRequest } from "./auth/schemes.js";
+
+// Never read. An entry keeps the Request alive as long as its Response body, so the caller's abort
+// still reaches a body that is being read.
+const sentRequests = new WeakMap<ReadableStream, readonly Request[]>();
 
 export class RawClient {
   readonly #config: RawClientOptions;
+  readonly #urlBuilder: UrlBuilder;
+  readonly #headersBuilder: HeadersBuilder;
+  readonly #responseReader: ResponseReader;
 
   constructor(config: RawClientOptions) {
     this.#config = config;
+    this.#urlBuilder = new UrlBuilder(config);
+    this.#headersBuilder = new HeadersBuilder(config);
+    this.#responseReader = new ResponseReader(config);
   }
 
-  execute<T, E extends AnyApiError>(
+  execute<T, E extends ApiError>(
     apiRequest: ApiRequest,
     responseHandler: ResponseHandler<T, E>,
     options?: RequestOptions,
   ): ApiPromise<T, E> {
-    return new ApiPromise<T, E>(this.#dispatch<T, E>(apiRequest, responseHandler, options));
+    return new ApiPromise(this.#dispatch(apiRequest, responseHandler, options));
   }
 
-  async #dispatch<T, E extends AnyApiError>(
+  paginate<TRequest, TPage, TItem, E extends ApiError, TState extends PagingState<TPage, TState>>(
+    request: TRequest,
+    state: TState,
+    buildRequest: (request: TRequest, state: TState) => ApiRequest,
+    responseHandler: ResponseHandler<TPage, E>,
+    itemsSelector: (page: TPage) => readonly TItem[] | null | undefined,
+    options?: RequestOptions,
+  ): Pageable<TPage, TItem, E> {
+    const requestSnapshot = { ...request };
+    const dispatch = (apiRequest: ApiRequest): Promise<RequestOutcome<TPage, E>> =>
+      this.#dispatch(apiRequest, responseHandler, options);
+
+    return new Pageable(async function* () {
+      let current = state;
+      while (true) {
+        const outcome = await dispatch(buildRequest(requestSnapshot, current));
+        yield outcome;
+        if (!outcome.ok) return;
+        const itemCount = itemsSelector(outcome.data)?.length ?? 0;
+        const next = current.next(outcome.data, outcome.headers, itemCount, outcome.uri);
+        if (next === null) return;
+        current = next;
+      }
+    }, itemsSelector);
+  }
+
+  async #dispatch<T, E extends ApiError>(
     apiRequest: ApiRequest,
     responseHandler: ResponseHandler<T, E>,
     options: RequestOptions | undefined,
   ): Promise<RequestOutcome<T, E>> {
-    const callerSignal = options?.signal === undefined ? [] : [options.signal];
+    const startedAt = Date.now();
+    const callerSignal = options?.signal ?? neverAbortedSignal();
     const uploadController = new AbortController();
-    let uri = templateUri(apiRequest.url);
+    const streamRequestController = new AbortController();
+    const abortStreamRequest = (): void => streamRequestController.abort();
 
-    let url: URL;
-    let body: BodyContent;
-    let headers: Headers;
-    try {
-      url = resolveUri(apiRequest.url, apiRequest.pathParams, this.#config.defaultPathParams);
-      uri = url.href;
-      applyQuery(url, apiRequest.query, this.#config.defaultQuery);
-      body = buildBody(apiRequest.body, AbortSignal.any([...callerSignal, uploadController.signal]));
-      headers = buildHeaders([
-        [
-          { name: "content-type", value: body.contentType, schema: s.optional(s.string()) },
-          { name: "content-disposition", value: body.contentDisposition, schema: s.optional(s.string()) },
-        ],
-        this.#config.defaultHeaders,
-        apiRequest.headers,
-      ]);
-    } catch (err) {
-      if (err instanceof CoreError) throw err;
-      if (err instanceof SchemaError) {
-        throw new EncodeError(`${apiRequest.method} ${uri} failed: Request value could not be encoded.`, {
-          cause: err,
-          method: apiRequest.method,
-          uri,
-        });
-      }
-      throw err;
-    }
+    const url = this.#urlBuilder.build(apiRequest);
+    const { uri } = url;
 
-    const policy = new RetryPolicy(buildRetryOptions(options?.retry, this.#config.retry));
+    const body = buildBody(
+      apiRequest.method,
+      uri,
+      apiRequest.body,
+      AbortSignal.any([callerSignal, uploadController.signal]),
+    );
 
-    const response = await policy.execute(apiRequest.method, options?.signal, async () => {
-      const attemptUrl = new URL(url);
-      let attemptHeaders: Headers;
+    const logger = new HttpLogger(
+      options?.logging,
+      this.#config.logging,
+      apiRequest.method,
+      url.withQuery([]),
+    );
+    const headers = this.#headersBuilder.build(apiRequest, uri, body);
+    const policy = new RetryPolicy(options?.retry, this.#config.retry);
+    const hooks = new HookRunner(
+      options?.hooks,
+      this.#config.hooks,
+      { method: apiRequest.method, uri, options },
+      callerSignal,
+    );
+    const response = await policy.execute(
+      apiRequest.method,
+      callerSignal,
+      startedAt,
+      logger,
+      async (timeout) => {
+        const authenticated = await authenticateRequest(
+          apiRequest.method,
+          apiRequest.auth,
+          url,
+          headers,
+          callerSignal,
+          startedAt,
+          logger,
+        );
 
-      try {
-        const auth = await apiRequest.auth.resolve(options?.signal);
-        if (auth.query !== undefined && auth.query.length > 0) {
-          attemptUrl.search = queryString([auth.query], [...attemptUrl.searchParams]);
+        const isStreaming = body.streaming === true;
+        const timeoutController = new AbortController();
+        const signal = AbortSignal.any([
+          callerSignal,
+          timeoutController.signal,
+          streamRequestController.signal,
+        ]);
+        if (isStreaming) {
+          timeoutController.signal.addEventListener(
+            "abort",
+            () => uploadController.abort(timeoutController.signal.reason),
+            { once: true },
+          );
         }
-        attemptHeaders = buildHeaders([auth.headers], auth.cookies, headers);
-      } catch (err) {
-        if (err instanceof CoreError && err.kind !== "api" && err.kind !== "decode" && err.kind !== "encode")
-          throw err;
-        if (options?.signal?.aborted) throw options.signal.reason;
-        throw new AuthError(
-          `${apiRequest.method} ${uri} failed: ${
-            err instanceof Error && err.message !== "" ? err.message : "A credential could not be obtained."
-          }`,
-          { cause: err, method: apiRequest.method, uri },
+
+        const requests = await hooks.beforeRequest(
+          new Request(authenticated.url, {
+            method: apiRequest.method,
+            headers: authenticated.headers,
+            body: body.body,
+            signal,
+            ...(isStreaming ? { duplex: "half", window: null, redirect: "error" } : {}),
+          }),
         );
-      }
+        const request = requests[0];
+        await logger.logRequest(request);
 
-      const isStreaming = body.streaming === true;
-      const timeoutController = new AbortController();
-      const signal = AbortSignal.any([...callerSignal, timeoutController.signal]);
-      if (isStreaming) {
-        timeoutController.signal.addEventListener(
-          "abort",
-          () => uploadController.abort(timeoutController.signal.reason),
-          { once: true },
-        );
-      }
+        const timer = startTimeout(timeoutController, timeout, apiRequest.method, uri);
+        let response: Response;
+        try {
+          response = await this.#config.fetch.call(undefined, request);
+        } catch (err) {
+          if (err instanceof ConnectionError || err instanceof TimeoutError)
+            return { kind: "fault", error: err, isStreaming };
+          if (err instanceof CoreError) throw err;
+          if (signal.reason instanceof TimeoutError)
+            return { kind: "fault", error: signal.reason, isStreaming };
+          if (signal.aborted) throw signal.reason;
+          return {
+            kind: "fault",
+            error: new ConnectionError(
+              `${apiRequest.method} ${uri} failed: ${
+                err instanceof Error && err.message !== "" ? err.message : "Connection error."
+              }`,
+              { cause: err, method: apiRequest.method, uri },
+            ),
+            isStreaming,
+          };
+        } finally {
+          clearTimeout(timer);
+        }
 
-      const timer = startTimeout(timeoutController, policy.timeout, apiRequest.method, uri);
-      let response: Response;
-      try {
-        response = await this.#config.fetch.call(undefined, attemptUrl, {
-          method: apiRequest.method,
-          headers: attemptHeaders,
-          body: body.body,
-          signal,
-          ...(isStreaming ? { duplex: "half", window: null, redirect: "error" } : {}),
-        });
-      } catch (err) {
-        if (err instanceof CoreError && (err.kind === "connection" || err.kind === "timeout"))
-          return { kind: "fault", error: err, isStreaming };
-        if (err instanceof CoreError) throw err;
-        if (signal.aborted) throw signal.reason;
-        return {
-          kind: "fault",
-          error: new ConnectionError(
-            `${apiRequest.method} ${uri} failed: ${
-              err instanceof Error && err.message !== "" ? err.message : "Connection error."
-            }`,
-            { cause: err, method: apiRequest.method, uri },
-          ),
-          isStreaming,
-        };
-      } finally {
-        clearTimeout(timer);
-      }
-
-      if (response.status === 401) apiRequest.auth.invalidate?.();
-      return {
-        kind: "response",
-        response,
-        isStreaming,
-        discard: (): void => {
+        const discard = (): void => {
           void Promise.resolve(response.body?.cancel()).catch(() => {});
-        },
-      };
-    });
+        };
+        let reauthenticate = false;
+        try {
+          logger.logResponse(response);
+          reauthenticate =
+            response.status === 401 &&
+            apiRequest.auth.invalidate?.(authenticated.headers.get("authorization")) === true &&
+            !isStreaming;
+          response = await hooks.afterResponse(response);
+        } catch (err) {
+          discard();
+          throw err;
+        }
+        if (response.body !== null) sentRequests.set(response.body, requests);
+        return { kind: "response", response, isStreaming, reauthenticate, discard };
+      },
+    );
 
-    try {
-      if (isSuccess(response.status)) {
-        const data = await decodeResponse(responseHandler.success, response, apiRequest.method, uri);
-        return { ok: true, status: response.status, headers: response.headers, data };
-      }
-
-      const payload = await decodeErrorPayload(
+    if (isSuccess(response.status)) {
+      const data = await this.#responseReader.read(
+        responseHandler.success,
         response,
-        responseHandler.errorFactory.errors,
-        response.status,
         apiRequest.method,
         uri,
+        callerSignal,
+        abortStreamRequest,
       );
-      const error = new responseHandler.errorFactory({
-        status: response.status,
-        headers: response.headers,
-        method: apiRequest.method,
-        uri,
-        payload,
-      });
-
-      return { ok: false, status: response.status, headers: response.headers, error };
-    } catch (err) {
-      if (options?.signal?.aborted && err instanceof DecodeError && err.cause === options?.signal.reason)
-        throw options?.signal.reason;
-      throw err;
+      return { ok: true, status: response.status, headers: response.headers, uri, data };
     }
+
+    const error = await this.#responseReader.readError(
+      responseHandler.errorFactory,
+      response,
+      apiRequest.method,
+      uri,
+      callerSignal,
+      abortStreamRequest,
+    );
+    return { ok: false, status: response.status, headers: response.headers, uri, error };
   }
 }
 
 function isSuccess(status: number): boolean {
   return status >= 200 && status <= 299;
+}
+
+function neverAbortedSignal(): AbortSignal {
+  return new AbortController().signal;
 }
 
 function startTimeout(

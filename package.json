@@ -1,7 +1,7 @@
 {
   "name": "payrix-gp-apimatic-sdk",
-  "version": "1.7.0",
-  "description": "Sample SDKs for Worldpay by APIMatic",
+  "version": "0.1.0",
+  "description": "Sample SDKs for Payrix GP by APIMatic",
   "homepage": "https://docs.worldpay.com/",
   "type": "module",
   "exports": {
@@ -74,6 +74,6 @@
     "typescript": "^7.0.2"
   },
   "dependencies": {
-    "zod": "^3.25.0 || ^4.0.0"
+    "zod": "^4.1.0"
   }
 }

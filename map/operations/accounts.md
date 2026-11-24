@@ -2,133 +2,135 @@
 
 # Accounts — operations
 
-Accessor: `client.accounts` · Source: `src/resources/accounts.ts` · 5 operations · Request and error types: namespace `Accounts`
+Accessor: `client.accounts` · Source: `src/resources/accounts.ts` · 4 operations · Request and error types: namespace `Accounts`
 
 **Type sources**: every type an operation names, with the file that declares it and the schema value exported beside it. Import every name from `payrix-gp-apimatic-sdk`; the `Source` path is where to **read** the shape, never what to import. `ApiError`, the runtime error family and the file vocabulary are excluded — see sdk-map.md.
 
-### deleteAccountsId
+### editAccountSingle
 
-- **Signature**: `deleteAccountsId(request: Accounts.DeleteAccountsIdRequest, options?: RequestOptions): ApiPromise<AccountsResponseResult, Accounts.DeleteAccountsIdError>`
-- **Wire**: `DELETE /accounts/{id}`
-- **Auth**: any of `apiKey`, `sessionKey`, `txnSessionKey` — the first one configured is sent
-- **Request body**: none — no `Content-Type` header is sent
+- **Signature**: `editAccountSingle(request: Accounts.EditAccountSingleRequest, options?: RequestOptions): ApiPromise<AccountsSingleFundmanagementResponse, Accounts.EditAccountSingleError>`
+- **Wire**: `PATCH /accounts/{id}`
+- **Auth**: `bearerAuth`
+- **Request body**: `application/json` — the `body` field. **Optional**: omit it and the request carries no body and no `Content-Type` header at all
 - **SDK-sent**: `header Idempotency-Key` (minted per call)
-- **Returns**: `AccountsResponseResult`
-- **Error**: `PayrixError` with `kind: "api"`, an instance of `Accounts.DeleteAccountsIdError` — **typed arms**, narrowed on `err.payload.kind`
-- **Error arms**: `"errorFourHundred1"` [400] `ErrorFourHundred1` · `"undeclared"` [any other] `rawBody: ArrayBuffer`
+- **Returns**: `AccountsSingleFundmanagementResponse`
+- **Error**: `GlobalPaymentsApiError` with `kind: "api"`, an instance of `Accounts.EditAccountSingleError` — **typed arms**, narrowed on `err.payload.kind`
+- **Error arms**: `"objRequestInvalid400"` [400] `ObjRequestInvalid400` · `"authenticationInvalid401"` [401] `AuthenticationInvalid401` · `"notAuthorized403"` [403] `NotAuthorized403` · `"error404"` [404] no body · `"serverError500"` [500] `ServerError500` · `"unknownServerError501"` [501] `UnknownServerError501` · `"unknownPlatformError502Accounts"` [502] `UnknownPlatformError502Accounts` · `"serverTimeout504"` [504] `ServerTimeout504` · `"undeclared"` [any other] `rawBody: ArrayBuffer`
 
-**Fields** — `Accounts.DeleteAccountsIdRequest` (3):
+**Fields** — `Accounts.EditAccountSingleRequest` (4):
 
-| Field | Channel | Wire | Type | Req |
-| --- | --- | --- | --- | --- |
-| `id` | `path` | — | `string` | yes |
-| `token` | `header` | — | `string` | no |
-| `requestToken` | `header` | `request-token` | `string` | no |
-
-| Type | Schema value | Source |
-| --- | --- | --- |
-| `AccountsResponseResult` | `accountsResponseResultSchema` | `src/models/accounts-response-result.ts` |
-| `ErrorFourHundred1` | `errorFourHundred1Schema` | `src/models/error-four-hundred1.ts` |
-
-### getAccounts
-
-- **Signature**: `getAccounts(request: Accounts.GetAccountsRequest, options?: RequestOptions): ApiPromise<AccountsResponseResult, Accounts.GetAccountsError>`
-- **Wire**: `GET /accounts`
-- **Auth**: any of `apiKey`, `sessionKey`, `txnSessionKey` — the first one configured is sent
-- **Request body**: none — no `Content-Type` header is sent
-- **Returns**: `AccountsResponseResult`
-- **Error**: `PayrixError` with `kind: "api"`, an instance of `Accounts.GetAccountsError` — **typed arms**, narrowed on `err.payload.kind`
-- **Error arms**: `"errorFourHundred1"` [400] `ErrorFourHundred1` · `"undeclared"` [any other] `rawBody: ArrayBuffer`
-
-**Fields** — `Accounts.GetAccountsRequest` (7):
-
-| Field | Channel | Wire | Type | Req |
-| --- | --- | --- | --- | --- |
-| `pageNumber` | `query` | `page[number]` | `number` | no |
-| `pageLimit` | `query` | `page[limit]` | `number` | no |
-| `embed` | `query` | — | `string` | no |
-| `token` | `header` | — | `string` | no |
-| `requestToken` | `header` | `request-token` | `string` | no |
-| `search` | `header` | — | `string` | no |
-| `totals` | `header` | — | `string` | no |
+| Field | Channel | Wire | Type | Req | Default |
+| --- | --- | --- | --- | --- | --- |
+| `id` | `path` | — | `string` | yes | — |
+| `xGpVersion` | `header` | `X-GP-Version` | `string` | no | `"2021-03-22"` |
+| `xGpIdempotency` | `header` | `X-GP-Idempotency` | `string` | no | — |
+| `body` | `body` | — | `AccountsSingleFundmanagementRequest` | no | — |
 
 | Type | Schema value | Source |
 | --- | --- | --- |
-| `AccountsResponseResult` | `accountsResponseResultSchema` | `src/models/accounts-response-result.ts` |
-| `ErrorFourHundred1` | `errorFourHundred1Schema` | `src/models/error-four-hundred1.ts` |
+| `AccountsSingleFundmanagementRequest` | `accountsSingleFundmanagementRequestSchema` | `src/models/accounts-single-fundmanagement-request.ts` |
+| `AccountsSingleFundmanagementResponse` | `accountsSingleFundmanagementResponseSchema` | `src/models/accounts-single-fundmanagement-response.ts` |
+| `ObjRequestInvalid400` | `objRequestInvalid400Schema` | `src/models/obj-request-invalid400.ts` |
+| `AuthenticationInvalid401` | `authenticationInvalid401Schema` | `src/models/authentication-invalid401.ts` |
+| `NotAuthorized403` | `notAuthorized403Schema` | `src/models/not-authorized403.ts` |
+| `ServerError500` | `serverError500Schema` | `src/models/server-error500.ts` |
+| `UnknownServerError501` | `unknownServerError501Schema` | `src/models/unknown-server-error501.ts` |
+| `UnknownPlatformError502Accounts` | `unknownPlatformError502AccountsSchema` | `src/models/unknown-platform-error502-accounts.ts` |
+| `ServerTimeout504` | `serverTimeout504Schema` | `src/models/server-timeout504.ts` |
 
-### getAccountsId
+### getAccountSingle
 
-- **Signature**: `getAccountsId(request: Accounts.GetAccountsIdRequest, options?: RequestOptions): ApiPromise<AccountsResponseResult, Accounts.GetAccountsIdError>`
+- **Signature**: `getAccountSingle(request: Accounts.GetAccountSingleRequest, options?: RequestOptions): ApiPromise<AccountsResponse2, Accounts.GetAccountSingleError>`
 - **Wire**: `GET /accounts/{id}`
-- **Auth**: any of `apiKey`, `sessionKey`, `txnSessionKey` — the first one configured is sent
+- **Auth**: `bearerAuth`
 - **Request body**: none — no `Content-Type` header is sent
-- **Returns**: `AccountsResponseResult`
-- **Error**: `PayrixError` with `kind: "api"`, an instance of `Accounts.GetAccountsIdError` — **typed arms**, narrowed on `err.payload.kind`
-- **Error arms**: `"errorFourHundred1"` [400] `ErrorFourHundred1` · `"undeclared"` [any other] `rawBody: ArrayBuffer`
+- **Returns**: `AccountsResponse2`
+- **Error**: `GlobalPaymentsApiError` with `kind: "api"`, an instance of `Accounts.GetAccountSingleError` — **typed arms**, narrowed on `err.payload.kind`
+- **Error arms**: `"objRequestInvalid400"` [400] `ObjRequestInvalid400` · `"authenticationInvalid401"` [401] `AuthenticationInvalid401` · `"notAuthorized403"` [403] `NotAuthorized403` · `"error404"` [404] no body · `"serverError500"` [500] `ServerError500` · `"unknownServerError501"` [501] `UnknownServerError501` · `"unknownPlatformError502Accounts"` [502] `UnknownPlatformError502Accounts` · `"serverTimeout504"` [504] `ServerTimeout504` · `"undeclared"` [any other] `rawBody: ArrayBuffer`
 
-**Fields** — `Accounts.GetAccountsIdRequest` (4):
+**Fields** — `Accounts.GetAccountSingleRequest` (2):
 
-| Field | Channel | Wire | Type | Req |
-| --- | --- | --- | --- | --- |
-| `id` | `path` | — | `string` | yes |
-| `embed` | `query` | — | `string` | no |
-| `token` | `header` | — | `string` | no |
-| `requestToken` | `header` | `request-token` | `string` | no |
+| Field | Channel | Wire | Type | Req | Default |
+| --- | --- | --- | --- | --- | --- |
+| `id` | `path` | — | `string` | yes | — |
+| `xGpVersion` | `header` | `X-GP-Version` | `string` | no | `"2021-03-22"` |
 
 | Type | Schema value | Source |
 | --- | --- | --- |
-| `AccountsResponseResult` | `accountsResponseResultSchema` | `src/models/accounts-response-result.ts` |
-| `ErrorFourHundred1` | `errorFourHundred1Schema` | `src/models/error-four-hundred1.ts` |
+| `AccountsResponse2` | `accountsResponse2Schema` | `src/models/unions/accounts-response2.ts` |
+| `ObjRequestInvalid400` | `objRequestInvalid400Schema` | `src/models/obj-request-invalid400.ts` |
+| `AuthenticationInvalid401` | `authenticationInvalid401Schema` | `src/models/authentication-invalid401.ts` |
+| `NotAuthorized403` | `notAuthorized403Schema` | `src/models/not-authorized403.ts` |
+| `ServerError500` | `serverError500Schema` | `src/models/server-error500.ts` |
+| `UnknownServerError501` | `unknownServerError501Schema` | `src/models/unknown-server-error501.ts` |
+| `UnknownPlatformError502Accounts` | `unknownPlatformError502AccountsSchema` | `src/models/unknown-platform-error502-accounts.ts` |
+| `ServerTimeout504` | `serverTimeout504Schema` | `src/models/server-timeout504.ts` |
 
-### postAccounts
+### getFmaAccountDetails
 
-- **Signature**: `postAccounts(request: Accounts.PostAccountsRequest, options?: RequestOptions): ApiPromise<AccountsResponseResult, Accounts.PostAccountsError>`
-- **Wire**: `POST /accounts`
-- **Auth**: any of `apiKey`, `sessionKey`, `txnSessionKey` — the first one configured is sent
-- **Request body**: `application/json` — the `body` field
-- **SDK-sent**: `header Idempotency-Key` (minted per call)
-- **Returns**: `AccountsResponseResult`
-- **Error**: `PayrixError` with `kind: "api"`, an instance of `Accounts.PostAccountsError` — **typed arms**, narrowed on `err.payload.kind`
-- **Error arms**: `"errorFourHundred1"` [400] `ErrorFourHundred1` · `"undeclared"` [any other] `rawBody: ArrayBuffer`
+- **Signature**: `getFmaAccountDetails(request: Accounts.GetFmaAccountDetailsRequest, options?: RequestOptions): ApiPromise<AccountsGetFma, Accounts.GetFmaAccountDetailsError>`
+- **Wire**: `GET /merchants/{MER_id}/accounts/{FMA_id}`
+- **Auth**: `bearerAuth`
+- **Request body**: none — no `Content-Type` header is sent
+- **Returns**: `AccountsGetFma`
+- **Error**: `GlobalPaymentsApiError` with `kind: "api"`, an instance of `Accounts.GetFmaAccountDetailsError` — **typed arms**, narrowed on `err.payload.kind`
+- **Error arms**: `"objRequestInvalid400"` [400] `ObjRequestInvalid400` · `"authenticationInvalid401"` [401] `AuthenticationInvalid401` · `"notAuthorized403"` [403] `NotAuthorized403` · `"error404"` [404] no body · `"serverError500"` [500] `ServerError500` · `"unknownServerError501"` [501] `UnknownServerError501` · `"unknownPlatformError502Accounts"` [502] `UnknownPlatformError502Accounts` · `"serverTimeout504"` [504] `ServerTimeout504` · `"undeclared"` [any other] `rawBody: ArrayBuffer`
 
-**Fields** — `Accounts.PostAccountsRequest` (3):
+**Fields** — `Accounts.GetFmaAccountDetailsRequest` (3):
 
-| Field | Channel | Wire | Type | Req |
-| --- | --- | --- | --- | --- |
-| `token` | `header` | — | `string` | no |
-| `requestToken` | `header` | `request-token` | `string` | no |
-| `body` | `body` | — | `AccountsRequest1` | yes |
-
-| Type | Schema value | Source |
-| --- | --- | --- |
-| `AccountsRequest1` | `accountsRequest1Schema` | `src/models/accounts-request1.ts` |
-| `AccountsResponseResult` | `accountsResponseResultSchema` | `src/models/accounts-response-result.ts` |
-| `ErrorFourHundred1` | `errorFourHundred1Schema` | `src/models/error-four-hundred1.ts` |
-
-### putAccountsId
-
-- **Signature**: `putAccountsId(request: Accounts.PutAccountsIdRequest, options?: RequestOptions): ApiPromise<AccountsResponseResult, Accounts.PutAccountsIdError>`
-- **Wire**: `PUT /accounts/{id}`
-- **Auth**: any of `apiKey`, `sessionKey`, `txnSessionKey` — the first one configured is sent
-- **Request body**: `application/json` — the `body` field
-- **SDK-sent**: `header Idempotency-Key` (minted per call)
-- **Returns**: `AccountsResponseResult`
-- **Error**: `PayrixError` with `kind: "api"`, an instance of `Accounts.PutAccountsIdError` — **typed arms**, narrowed on `err.payload.kind`
-- **Error arms**: `"errorFourHundred1"` [400] `ErrorFourHundred1` · `"undeclared"` [any other] `rawBody: ArrayBuffer`
-
-**Fields** — `Accounts.PutAccountsIdRequest` (4):
-
-| Field | Channel | Wire | Type | Req |
-| --- | --- | --- | --- | --- |
-| `id` | `path` | — | `string` | yes |
-| `token` | `header` | — | `string` | no |
-| `requestToken` | `header` | `request-token` | `string` | no |
-| `body` | `body` | — | `AccountsPutRequest` | yes |
+| Field | Channel | Wire | Type | Req | Default |
+| --- | --- | --- | --- | --- | --- |
+| `fmaId` | `path` | `FMA_id` | `string` | yes | — |
+| `merId` | `path` | `MER_id` | `string` | yes | — |
+| `xGpVersion` | `header` | `X-GP-Version` | `string` | no | `"2021-03-22"` |
 
 | Type | Schema value | Source |
 | --- | --- | --- |
-| `AccountsPutRequest` | `accountsPutRequestSchema` | `src/models/accounts-put-request.ts` |
-| `AccountsResponseResult` | `accountsResponseResultSchema` | `src/models/accounts-response-result.ts` |
-| `ErrorFourHundred1` | `errorFourHundred1Schema` | `src/models/error-four-hundred1.ts` |
+| `AccountsGetFma` | `accountsGetFmaSchema` | `src/models/accounts-get-fma.ts` |
+| `ObjRequestInvalid400` | `objRequestInvalid400Schema` | `src/models/obj-request-invalid400.ts` |
+| `AuthenticationInvalid401` | `authenticationInvalid401Schema` | `src/models/authentication-invalid401.ts` |
+| `NotAuthorized403` | `notAuthorized403Schema` | `src/models/not-authorized403.ts` |
+| `ServerError500` | `serverError500Schema` | `src/models/server-error500.ts` |
+| `UnknownServerError501` | `unknownServerError501Schema` | `src/models/unknown-server-error501.ts` |
+| `UnknownPlatformError502Accounts` | `unknownPlatformError502AccountsSchema` | `src/models/unknown-platform-error502-accounts.ts` |
+| `ServerTimeout504` | `serverTimeout504Schema` | `src/models/server-timeout504.ts` |
+
+### getMerchantAccounts
+
+- **Signature**: `getMerchantAccounts(request?: Accounts.GetMerchantAccountsRequest, options?: RequestOptions): ApiPromise<AccountsList, Accounts.GetMerchantAccountsError>`
+- **Wire**: `GET /accounts`
+- **Auth**: `bearerAuth`
+- **Request body**: none — no `Content-Type` header is sent
+- **Returns**: `AccountsList`
+- **Error**: `GlobalPaymentsApiError` with `kind: "api"`, an instance of `Accounts.GetMerchantAccountsError` — **typed arms**, narrowed on `err.payload.kind`
+- **Error arms**: `"objRequestInvalid400"` [400] `ObjRequestInvalid400` · `"authenticationInvalid401"` [401] `AuthenticationInvalid401` · `"notAuthorized403"` [403] `NotAuthorized403` · `"error404"` [404] no body · `"serverError500"` [500] `ServerError500` · `"unknownServerError501"` [501] `UnknownServerError501` · `"unknownPlatformError502Accounts"` [502] `UnknownPlatformError502Accounts` · `"serverTimeout504"` [504] `ServerTimeout504` · `"undeclared"` [any other] `rawBody: ArrayBuffer`
+
+**Fields** — `Accounts.GetMerchantAccountsRequest` (10):
+
+| Field | Channel | Wire | Type | Req | Default |
+| --- | --- | --- | --- | --- | --- |
+| `page` | `query` | — | `number` | no | `1` |
+| `pageSize` | `query` | `page_size` | `number` | no | `5` |
+| `order` | `query` | — | `DataDictionaryV1PaginationOrder` | no | — |
+| `orderBy` | `query` | `order_by` | `DataDictionaryV1PaginationOrderBy` | no | — |
+| `status` | `query` | — | `DataDictionaryV1EntityStatus` | no | — |
+| `name` | `query` | — | `string` | no | — |
+| `id` | `query` | — | `string` | no | — |
+| `fromTimeCreated` | `query` | `from_time_created` | `string` (date) | no | — |
+| `toTimeCreated` | `query` | `to_time_created` | `string` (date) | no | — |
+| `xGpVersion` | `header` | `X-GP-Version` | `string` | no | `"2021-03-22"` |
+
+| Type | Schema value | Source |
+| --- | --- | --- |
+| `DataDictionaryV1PaginationOrder` | `dataDictionaryV1PaginationOrderSchema` | `src/models/data-dictionary-v1-pagination-order.ts` |
+| `DataDictionaryV1PaginationOrderBy` | `dataDictionaryV1PaginationOrderBySchema` | `src/models/data-dictionary-v1-pagination-order-by.ts` |
+| `DataDictionaryV1EntityStatus` | `dataDictionaryV1EntityStatusSchema` | `src/models/data-dictionary-v1-entity-status.ts` |
+| `AccountsList` | `accountsListSchema` | `src/models/accounts-list.ts` |
+| `ObjRequestInvalid400` | `objRequestInvalid400Schema` | `src/models/obj-request-invalid400.ts` |
+| `AuthenticationInvalid401` | `authenticationInvalid401Schema` | `src/models/authentication-invalid401.ts` |
+| `NotAuthorized403` | `notAuthorized403Schema` | `src/models/not-authorized403.ts` |
+| `ServerError500` | `serverError500Schema` | `src/models/server-error500.ts` |
+| `UnknownServerError501` | `unknownServerError501Schema` | `src/models/unknown-server-error501.ts` |
+| `UnknownPlatformError502Accounts` | `unknownPlatformError502AccountsSchema` | `src/models/unknown-platform-error502-accounts.ts` |
+| `ServerTimeout504` | `serverTimeout504Schema` | `src/models/server-timeout504.ts` |
 

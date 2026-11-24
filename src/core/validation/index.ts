@@ -1,17 +1,28 @@
 export {
   array,
   boolean,
+  json,
   literal,
   nullable,
-  number,
   optional,
   record,
   string,
   union,
   unknown,
+  float64,
   gte,
   int,
   lte,
+  gt,
+  lt,
+  multipleOf,
+  email,
+  hostname,
+  ipv4,
+  ipv6,
+  url,
+  minLength,
+  maxLength,
 } from "zod/v4-mini";
 export {
   lazy,
@@ -22,6 +33,7 @@ export {
   dateTime,
   rfc1123DateTime,
   unixSecondsDateTime,
+  intOrDigits,
   dateOnly,
   bytes,
   base64UrlBytes,
@@ -29,4 +41,12 @@ export {
   base32HexBytes,
   base16Bytes,
 } from "./entries.js";
-export { object, discriminatedUnion, enumOf, of } from "./schema.js";
+export { object, discriminatedUnion, bestFit, enumOf, of, lazySchema, type Shape } from "./schema.js";
+export {
+  minProperties,
+  maxProperties,
+  uniqueItems,
+  uriReference,
+  jsonPointer,
+  pattern,
+} from "./constraints.js";

@@ -1,23 +1,63 @@
 import type { AuthSchemes } from "../auth-schemes.js";
-import { ApiError, type Declared, type ErrorDecoders, type ErrorPayload } from "../core/api-error.js";
+import { ApiError, type Declared, type Undeclared } from "../core/api-error.js";
 import type { ApiPromise } from "../core/api-promise.js";
 import type { RequestOptions } from "../core/api-request.js";
-import { anyAuth } from "../core/auth/schemes.js";
 import type { RawClient } from "../core/raw-client.js";
+import type { ErrorDecoders } from "../core/response-decoder.js";
 import { uuid } from "../core/uuid.js";
 import * as s from "../core/validation/index.js";
-import { errorFourHundred1Schema, type ErrorFourHundred1 } from "../models/error-four-hundred1.js";
-import { merchantsPutRequestSchema, type MerchantsPutRequest } from "../models/merchants-put-request.js";
+import type { Schema } from "../core/validation/schema.js";
 import {
-  merchantsResponseResultSchema,
-  type MerchantsResponseResult,
-} from "../models/merchants-response-result.js";
+  addressLookupResponseInternalSchema,
+  type AddressLookupResponse,
+} from "../models/address-lookup-response.js";
+import {
+  authenticationInvalid401Schema,
+  type AuthenticationInvalid401,
+} from "../models/authentication-invalid401.js";
+import {
+  createResponseMerchantsInternalSchema,
+  type CreateResponseMerchants,
+} from "../models/create-response-merchants.js";
+import {
+  documentsRequest2InternalSchema,
+  documentsRequest2Schema,
+  type DocumentsRequest2,
+} from "../models/documents-request2.js";
+import { documentsResponse2InternalSchema, type DocumentsResponse2 } from "../models/documents-response2.js";
+import { editRequestInternalSchema, editRequestSchema, type EditRequest } from "../models/edit-request.js";
+import {
+  getMerchantsListResponse2InternalSchema,
+  type GetMerchantsListResponse2,
+} from "../models/get-merchants-list-response2.js";
+import {
+  merchantsRequestInternalSchema,
+  merchantsRequestSchema,
+  type MerchantsRequest,
+} from "../models/merchants-request.js";
+import { merchantsResponse2InternalSchema, type MerchantsResponse2 } from "../models/merchants-response2.js";
+import { notAuthorized403Schema, type NotAuthorized403 } from "../models/not-authorized403.js";
+import { objRequestInvalid400Schema, type ObjRequestInvalid400 } from "../models/obj-request-invalid400.js";
+import { serverError500Schema, type ServerError500 } from "../models/server-error500.js";
+import { serverTimeout504Schema, type ServerTimeout504 } from "../models/server-timeout504.js";
+import {
+  statusMerchantsStatusSchema,
+  type StatusMerchantsStatus,
+} from "../models/status-merchants-status.js";
+import {
+  unknownPlatformError502AuthenticationsSchema,
+  type UnknownPlatformError502Authentications,
+} from "../models/unknown-platform-error502-authentications.js";
+import {
+  unknownServerError501Schema,
+  type UnknownServerError501,
+} from "../models/unknown-server-error501.js";
 import type { Servers } from "../servers.js";
 
 /**
- * Merchant details for transaction processing entities. Together with the entities table, this
- * table defines a merchant. A merchant is primarily an entity that accepts payments and transacts
- * with customers in Payrix Pro.
+ * Merchants represent a business entity on the Global Payments system. This is the entity that is
+ * selling goods and services and has a direct contractual relationship with Global Payments or with
+ * one of Global Payments partners.
  */
 export class Merchants {
   readonly #rawClient: RawClient;
@@ -31,45 +71,230 @@ export class Merchants {
   }
 
   /**
-   * getMerchants
+   * Address Lookup
    *
    * @remarks
-   * Query a Merchant, an organization that processes credit card payments, each associated with an
-   * Entity.
+   * To ensure the appropriate formatting of an address is included as part of a UK merchant
+   * boarding application, you can use Address Lookup to perform a search on all addresses with a
+   * certain house number or house name within a postal code.
    *
-   * @returns Response for query on merchants resource
+   * @returns OK
    *
-   * @throws {@link Merchants.GetMerchantsError} when the API answers with an error status — narrow
+   * @throws {@link Merchants.AddressLookupError} when the API answers with an error status — narrow
    * on `err.payload.kind`
    *
-   * @throws {@link PayrixError} when no usable response was produced: a connection failure, a
-   * timeout, a body that would not decode, a value that would not encode, or a credential that
-   * could not be obtained
+   * @throws {@link GlobalPaymentsApiError} when no usable response was produced: a connection
+   * failure, a timeout, a body that would not decode, a value that would not encode, or a
+   * credential that could not be obtained
    */
-  getMerchants(
-    request: Merchants.GetMerchantsRequest,
+  addressLookup(
+    request: Merchants.AddressLookupRequest,
     options?: RequestOptions,
-  ): ApiPromise<MerchantsResponseResult, Merchants.GetMerchantsError> {
+  ): ApiPromise<AddressLookupResponse, Merchants.AddressLookupError> {
     return this.#rawClient.execute(
       {
         method: "GET",
-        url: this.#servers.default("/merchants"),
-        auth: anyAuth(this.#auth.apiKey, this.#auth.sessionKey, this.#auth.txnSessionKey),
+        urlTemplate: this.#servers.default("/addresses"),
+        auth: this.#auth.bearerAuth,
+        pathParams: [],
         query: [
-          { name: "page[number]", value: request.pageNumber, schema: s.optional(s.number()) },
-          { name: "page[limit]", value: request.pageLimit, schema: s.optional(s.number()) },
-          { name: "embed", value: request.embed, schema: s.optional(s.string()) },
+          { name: "postal_code", value: request.postalCode, schema: s.string() },
+          { name: "building_number", value: request.buildingNumber, schema: s.optional(s.string()) },
+          { name: "building_name", value: request.buildingName, schema: s.optional(s.string()) },
         ],
         headers: [
-          { name: "token", value: request.token, schema: s.optional(s.string()) },
-          { name: "request-token", value: request.requestToken, schema: s.optional(s.string()) },
-          { name: "search", value: request.search, schema: s.optional(s.string()) },
-          { name: "totals", value: request.totals, schema: s.optional(s.string()) },
+          { name: "X-GP-Version", value: request.xGpVersion, schema: s.defaulted(s.string(), "2021-03-22") },
         ],
         body: { kind: "empty" },
       },
       {
-        success: { kind: "json", schema: merchantsResponseResultSchema },
+        success: { kind: "json", schema: addressLookupResponseInternalSchema },
+        errorFactory: Merchants.AddressLookupError,
+      },
+      options,
+    );
+  }
+
+  /**
+   * Board Merchant
+   *
+   * @remarks
+   * Board merchant
+   *
+   * Underwrite and configure a Merchant with payment processing capability on the Global Payments
+   * system.
+   *
+   * @returns OK
+   *
+   * @throws {@link Merchants.BoardMerchantError} when the API answers with an error status — narrow
+   * on `err.payload.kind`
+   *
+   * @throws {@link GlobalPaymentsApiError} when no usable response was produced: a connection
+   * failure, a timeout, a body that would not decode, a value that would not encode, or a
+   * credential that could not be obtained
+   */
+  boardMerchant(
+    request: Merchants.BoardMerchantRequest = {},
+    options?: RequestOptions,
+  ): ApiPromise<CreateResponseMerchants, Merchants.BoardMerchantError> {
+    return this.#rawClient.execute(
+      {
+        method: "POST",
+        urlTemplate: this.#servers.default("/merchants"),
+        auth: this.#auth.bearerAuth,
+        pathParams: [],
+        query: [],
+        headers: [
+          { name: "X-GP-Version", value: request.xGpVersion, schema: s.defaulted(s.string(), "2021-03-22") },
+          { name: "X-GP-Idempotency", value: request.xGpIdempotency, schema: s.optional(s.string()) },
+          { name: "Idempotency-Key", value: uuid(), schema: s.string() },
+        ],
+        body: {
+          kind: "json",
+          value: request.body,
+          schema: s.optional(s.lazy(() => merchantsRequestInternalSchema)),
+        },
+      },
+      {
+        success: { kind: "json", schema: createResponseMerchantsInternalSchema },
+        errorFactory: Merchants.BoardMerchantError,
+      },
+      options,
+    );
+  }
+
+  /**
+   * Edit Merchant
+   *
+   * @remarks
+   * Edit merchant
+   *
+   * Edit the detail associated with a Merchant.
+   *
+   * @returns OK
+   *
+   * @throws {@link Merchants.EditMerchantError} when the API answers with an error status — narrow
+   * on `err.payload.kind`
+   *
+   * @throws {@link GlobalPaymentsApiError} when no usable response was produced: a connection
+   * failure, a timeout, a body that would not decode, a value that would not encode, or a
+   * credential that could not be obtained
+   */
+  editMerchant(
+    request: Merchants.EditMerchantRequest,
+    options?: RequestOptions,
+  ): ApiPromise<CreateResponseMerchants, Merchants.EditMerchantError> {
+    return this.#rawClient.execute(
+      {
+        method: "PATCH",
+        urlTemplate: this.#servers.default("/merchants/{id}"),
+        auth: this.#auth.bearerAuth,
+        pathParams: [{ name: "id", value: request.id, schema: s.string() }],
+        query: [],
+        headers: [
+          { name: "X-GP-Version", value: request.xGpVersion, schema: s.defaulted(s.string(), "2021-03-22") },
+          { name: "X-GP-Idempotency", value: request.xGpIdempotency, schema: s.optional(s.string()) },
+          { name: "Idempotency-Key", value: uuid(), schema: s.string() },
+        ],
+        body: {
+          kind: "json",
+          value: request.body,
+          schema: s.optional(s.lazy(() => editRequestInternalSchema)),
+        },
+      },
+      {
+        success: { kind: "json", schema: createResponseMerchantsInternalSchema },
+        errorFactory: Merchants.EditMerchantError,
+      },
+      options,
+    );
+  }
+
+  /**
+   * Get Merchant info
+   *
+   * @remarks
+   * Get information about the merchant executing the action.
+   *
+   * @returns OK
+   *
+   * @throws {@link Merchants.GetMerchantSingleError} when the API answers with an error status —
+   * narrow on `err.payload.kind`
+   *
+   * @throws {@link GlobalPaymentsApiError} when no usable response was produced: a connection
+   * failure, a timeout, a body that would not decode, a value that would not encode, or a
+   * credential that could not be obtained
+   */
+  getMerchantSingle(
+    request: Merchants.GetMerchantSingleRequest,
+    options?: RequestOptions,
+  ): ApiPromise<MerchantsResponse2, Merchants.GetMerchantSingleError> {
+    return this.#rawClient.execute(
+      {
+        method: "GET",
+        urlTemplate: this.#servers.default("/merchants/{id}"),
+        auth: this.#auth.bearerAuth,
+        pathParams: [{ name: "id", value: request.id, schema: s.string() }],
+        query: [],
+        headers: [
+          { name: "X-GP-Version", value: request.xGpVersion, schema: s.defaulted(s.string(), "2021-03-22") },
+        ],
+        body: { kind: "empty" },
+      },
+      {
+        success: { kind: "json", schema: merchantsResponse2InternalSchema },
+        errorFactory: Merchants.GetMerchantSingleError,
+      },
+      options,
+    );
+  }
+
+  /**
+   * Get Merchants
+   *
+   * @remarks
+   * Get Merchants within a Partner Program.
+   *
+   * @returns OK
+   *
+   * @throws {@link Merchants.GetMerchantsError} when the API answers with an error status — narrow
+   * on `err.payload.kind`
+   *
+   * @throws {@link GlobalPaymentsApiError} when no usable response was produced: a connection
+   * failure, a timeout, a body that would not decode, a value that would not encode, or a
+   * credential that could not be obtained
+   */
+  getMerchants(
+    request: Merchants.GetMerchantsRequest = {},
+    options?: RequestOptions,
+  ): ApiPromise<GetMerchantsListResponse2, Merchants.GetMerchantsError> {
+    return this.#rawClient.execute(
+      {
+        method: "GET",
+        urlTemplate: this.#servers.default("/merchants"),
+        auth: this.#auth.bearerAuth,
+        pathParams: [],
+        query: [
+          { name: "page", value: request.page, schema: s.defaulted(s.float64(), 1) },
+          { name: "page_size", value: request.pageSize, schema: s.defaulted(s.float64(), 5) },
+          { name: "id", value: request.id, schema: s.optional(s.string()) },
+          {
+            name: "status",
+            value: request.status,
+            schema: s.optional(s.lazy(() => statusMerchantsStatusSchema)),
+          },
+          { name: "name", value: request.name, schema: s.optional(s.string()) },
+          { name: "from_time_created", value: request.fromTimeCreated, schema: s.optional(s.dateOnly()) },
+          { name: "to_time_created", value: request.toTimeCreated, schema: s.optional(s.dateOnly()) },
+        ],
+        headers: [
+          { name: "X-GP-Version", value: request.xGpVersion, schema: s.defaulted(s.string(), "2021-03-22") },
+          { name: "X-GP-Idempotency", value: request.xGpIdempotency, schema: s.optional(s.string()) },
+        ],
+        body: { kind: "empty" },
+      },
+      {
+        success: { kind: "json", schema: getMerchantsListResponse2InternalSchema },
         errorFactory: Merchants.GetMerchantsError,
       },
       options,
@@ -77,82 +302,47 @@ export class Merchants {
   }
 
   /**
-   * getMerchantsId
+   * Upload Merchant Documentation
    *
    * @remarks
-   * Query a Merchant, which is an organization that processes credit card payments and each is
-   * associated with an Entity.
+   * Upload merchant documentation
    *
-   * @returns Response for retrieving merchant response.
+   * Upload documentation related to a Merchant.
    *
-   * @throws {@link Merchants.GetMerchantsIdError} when the API answers with an error status —
-   * narrow on `err.payload.kind`
+   * @returns OK
    *
-   * @throws {@link PayrixError} when no usable response was produced: a connection failure, a
-   * timeout, a body that would not decode, a value that would not encode, or a credential that
-   * could not be obtained
+   * @throws {@link Merchants.UploadMerchantDocumentationError} when the API answers with an error
+   * status — narrow on `err.payload.kind`
+   *
+   * @throws {@link GlobalPaymentsApiError} when no usable response was produced: a connection
+   * failure, a timeout, a body that would not decode, a value that would not encode, or a
+   * credential that could not be obtained
    */
-  getMerchantsId(
-    request: Merchants.GetMerchantsIdRequest,
+  uploadMerchantDocumentation(
+    request: Merchants.UploadMerchantDocumentationRequest,
     options?: RequestOptions,
-  ): ApiPromise<MerchantsResponseResult, Merchants.GetMerchantsIdError> {
+  ): ApiPromise<DocumentsResponse2, Merchants.UploadMerchantDocumentationError> {
     return this.#rawClient.execute(
       {
-        method: "GET",
-        url: this.#servers.default("/merchants/{id}"),
-        auth: anyAuth(this.#auth.apiKey, this.#auth.sessionKey, this.#auth.txnSessionKey),
+        method: "POST",
+        urlTemplate: this.#servers.default("/merchants/{id}/documents"),
+        auth: this.#auth.bearerAuth,
         pathParams: [{ name: "id", value: request.id, schema: s.string() }],
-        query: [{ name: "embed", value: request.embed, schema: s.optional(s.string()) }],
+        query: [],
         headers: [
-          { name: "token", value: request.token, schema: s.optional(s.string()) },
-          { name: "request-token", value: request.requestToken, schema: s.optional(s.string()) },
-        ],
-        body: { kind: "empty" },
-      },
-      {
-        success: { kind: "json", schema: merchantsResponseResultSchema },
-        errorFactory: Merchants.GetMerchantsIdError,
-      },
-      options,
-    );
-  }
-
-  /**
-   * putMerchantsId
-   *
-   * @remarks
-   * Update a Merchant, A Merchant is an organization that processes credit card payments. Each
-   * Merchant is associated with an Entity.
-   *
-   * @returns Response for update on merchant's response.
-   *
-   * @throws {@link Merchants.PutMerchantsIdError} when the API answers with an error status —
-   * narrow on `err.payload.kind`
-   *
-   * @throws {@link PayrixError} when no usable response was produced: a connection failure, a
-   * timeout, a body that would not decode, a value that would not encode, or a credential that
-   * could not be obtained
-   */
-  putMerchantsId(
-    request: Merchants.PutMerchantsIdRequest,
-    options?: RequestOptions,
-  ): ApiPromise<MerchantsResponseResult, Merchants.PutMerchantsIdError> {
-    return this.#rawClient.execute(
-      {
-        method: "PUT",
-        url: this.#servers.default("/merchants/{id}"),
-        auth: anyAuth(this.#auth.apiKey, this.#auth.sessionKey, this.#auth.txnSessionKey),
-        pathParams: [{ name: "id", value: request.id, schema: s.string() }],
-        headers: [
-          { name: "token", value: request.token, schema: s.optional(s.string()) },
-          { name: "request-token", value: request.requestToken, schema: s.optional(s.string()) },
+          { name: "X-GP-Version", value: request.xGpVersion, schema: s.defaulted(s.string(), "2021-03-22") },
+          { name: "X-GP-Idempotency", value: request.xGpIdempotency, schema: s.optional(s.string()) },
           { name: "Idempotency-Key", value: uuid(), schema: s.string() },
         ],
-        body: { kind: "json", value: request.body, schema: merchantsPutRequestSchema },
+        body: {
+          kind: "json",
+          value: request.body,
+          schema: s.optional(s.lazy(() => documentsRequest2InternalSchema)),
+        },
       },
       {
-        success: { kind: "json", schema: merchantsResponseResultSchema },
-        errorFactory: Merchants.PutMerchantsIdError,
+        success: { kind: "json", schema: documentsResponse2InternalSchema },
+        errorFactory: Merchants.UploadMerchantDocumentationError,
       },
       options,
     );
@@ -160,132 +350,351 @@ export class Merchants {
 }
 
 export namespace Merchants {
-  export type GetMerchantsRequest = {
-    /**
-     * Set this path parameter to request a specific page of records. For example, set
-     * `?page[number]=2` to retrieve the second page of records for this request.
-     */
-    pageNumber?: number;
-    /**
-     * Set this path parameter to request up to a specific amount of records. By default 30 records
-     * are retrieved per page. The maximum limit that can be set is 100. For example, set
-     * `?page[limit]=50` to retrieve up to 50 records for this request.
-     */
-    pageLimit?: number;
-    /**
-     * Use the embed query parameter to include full object(s) of related resource(s) directly
-     * within the API response. This allows retrieval of associated resources in a single request,
-     * reducing the need for multiple round-trips. Format: GET
-     * https://{server}.payrix.com/{endpoint}?embed={relatedObject}
-     */
-    embed?: string;
-    /**
-     * A single-use, limited authentication layer in addition to an API Key or Session Key to
-     * authorize sensitive operations. <a
-     * href="https://docs.worldpay.com/apis/payrix/dev-int-guide/references/authentication/auth-tokens"
-     * target="_blank">Auth Tokens</a> add security by requiring one-time approval for specific
-     * actions.
-     */
-    token?: string;
-    /**
-     * A custom, one-time identifier for any API request (GET, PUT, POST, or DELETE). Blocks future
-     * requests with the same token for 48 hours, ensuring only the first request is processed.
-     * Valid values can contain 1-100 alphanumeric and special characters. See <a
-     * href="https://docs.worldpay.com/apis/payrix/dev-int-guide/references/authentication/request-tokens"
-     * target="_blank">Request Tokens</a> for more information.
-     */
-    requestToken?: string;
-    /**
-     * Set this header to filter or sort the list of resources that the method returns. See
-     * [Searches](https://docs.worldpay.com/apis/payrix/api-specification/payrix/partner#/rest/welcome-to-payrix-pro/welcome-to-payrix-pro)
-     * for detailed information and examples on how to use search header.
-     */
-    search?: string;
-    /**
-     * To configure a request to return a total for all instances of a field in a result set, use
-     * the totals header in the format `totals={operator}[]={key}`. This will calculate the desired
-     * total and return it in the `details > totals` object of the response. For instance, if you
-     * want to sum the `total` field of all transactions, you would use the `sum` operator. The
-     * response will include the result set, along with the calculated total in the `details`
-     * section. See [Collection
-     * Operators](https://docs.worldpay.com/apis/payrix/api-specification/payrix/partner#/rest/welcome-to-payrix-pro/welcome-to-payrix-pro)
-     * for detailed information and examples on how to use totals header.
-     */
-    totals?: string;
+  export type AddressLookupRequest = {
+    postalCode: string;
+    buildingNumber?: string;
+    buildingName?: string;
+    /** The version of the API to execute the request. @default "2021-03-22" */
+    xGpVersion?: string;
   };
+
+  export const addressLookupRequestSchema: Schema<AddressLookupRequest> = s.lazySchema(() =>
+    s.object<AddressLookupRequest>({
+      postalCode: s.string().check(s.minLength(1), s.maxLength(255)),
+      buildingNumber: s.optional(s.string()),
+      buildingName: s.optional(s.string()),
+      xGpVersion: s.defaulted(s.string().check(s.minLength(1), s.maxLength(50)), "2021-03-22"),
+    }),
+  );
+
+  export class AddressLookupError extends ApiError {
+    declare readonly payload:
+      | Declared<"objRequestInvalid400", ObjRequestInvalid400>
+      | Declared<"authenticationInvalid401", AuthenticationInvalid401>
+      | Declared<"notAuthorized403", NotAuthorized403>
+      | Declared<"error404", undefined>
+      | Declared<"serverError500", ServerError500>
+      | Declared<"unknownServerError501", UnknownServerError501>
+      | Declared<"unknownPlatformError502Authentications", UnknownPlatformError502Authentications>
+      | Declared<"serverTimeout504", ServerTimeout504>
+      | Undeclared;
+
+    static readonly errors: ErrorDecoders<AddressLookupError> = [
+      { on: 400, kind: "objRequestInvalid400", decode: { kind: "json", schema: objRequestInvalid400Schema } },
+      {
+        on: 401,
+        kind: "authenticationInvalid401",
+        decode: { kind: "json", schema: authenticationInvalid401Schema },
+      },
+      { on: 403, kind: "notAuthorized403", decode: { kind: "json", schema: notAuthorized403Schema } },
+      { on: 404, kind: "error404", decode: { kind: "empty" } },
+      { on: 500, kind: "serverError500", decode: { kind: "json", schema: serverError500Schema } },
+      {
+        on: 501,
+        kind: "unknownServerError501",
+        decode: { kind: "json", schema: unknownServerError501Schema },
+      },
+      {
+        on: 502,
+        kind: "unknownPlatformError502Authentications",
+        decode: { kind: "json", schema: unknownPlatformError502AuthenticationsSchema },
+      },
+      { on: 504, kind: "serverTimeout504", decode: { kind: "json", schema: serverTimeout504Schema } },
+    ];
+  }
+
+  export type BoardMerchantRequest = {
+    /** The version of the API to execute the request. @default "2021-03-22" */
+    xGpVersion?: string;
+    /**
+     * Integrator generated value submitted in the request header that is checked to ensure the same
+     * value has not been seen in the last 24 hours. It is used to ensure idempotency is maintained
+     * with this action.
+     */
+    xGpIdempotency?: string;
+    body?: MerchantsRequest;
+  };
+
+  export const boardMerchantRequestSchema: Schema<BoardMerchantRequest> = s.lazySchema(() =>
+    s.object<BoardMerchantRequest>({
+      xGpVersion: s.defaulted(s.string().check(s.minLength(1), s.maxLength(50)), "2021-03-22"),
+      xGpIdempotency: s.optional(s.string().check(s.minLength(1), s.maxLength(50))),
+      body: s.optional(s.lazy(() => merchantsRequestSchema)),
+    }),
+  );
+
+  export class BoardMerchantError extends ApiError {
+    declare readonly payload:
+      | Declared<"objRequestInvalid400", ObjRequestInvalid400>
+      | Declared<"authenticationInvalid401", AuthenticationInvalid401>
+      | Declared<"notAuthorized403", NotAuthorized403>
+      | Declared<"error404", undefined>
+      | Declared<"serverError500", ServerError500>
+      | Declared<"unknownServerError501", UnknownServerError501>
+      | Declared<"unknownPlatformError502Authentications", UnknownPlatformError502Authentications>
+      | Declared<"serverTimeout504", ServerTimeout504>
+      | Undeclared;
+
+    static readonly errors: ErrorDecoders<BoardMerchantError> = [
+      { on: 400, kind: "objRequestInvalid400", decode: { kind: "json", schema: objRequestInvalid400Schema } },
+      {
+        on: 401,
+        kind: "authenticationInvalid401",
+        decode: { kind: "json", schema: authenticationInvalid401Schema },
+      },
+      { on: 403, kind: "notAuthorized403", decode: { kind: "json", schema: notAuthorized403Schema } },
+      { on: 404, kind: "error404", decode: { kind: "empty" } },
+      { on: 500, kind: "serverError500", decode: { kind: "json", schema: serverError500Schema } },
+      {
+        on: 501,
+        kind: "unknownServerError501",
+        decode: { kind: "json", schema: unknownServerError501Schema },
+      },
+      {
+        on: 502,
+        kind: "unknownPlatformError502Authentications",
+        decode: { kind: "json", schema: unknownPlatformError502AuthenticationsSchema },
+      },
+      { on: 504, kind: "serverTimeout504", decode: { kind: "json", schema: serverTimeout504Schema } },
+    ];
+  }
+
+  export type EditMerchantRequest = {
+    /** This is the merchant id to uniquely identify the entity on the Global Payments system. */
+    id: string;
+    /** The version of the API to execute the request. @default "2021-03-22" */
+    xGpVersion?: string;
+    /**
+     * Integrator generated value submitted in the request header that is checked to ensure the same
+     * value has not been seen in the last 24 hours. It is used to ensure idempotency is maintained
+     * with this action.
+     */
+    xGpIdempotency?: string;
+    body?: EditRequest;
+  };
+
+  export const editMerchantRequestSchema: Schema<EditMerchantRequest> = s.lazySchema(() =>
+    s.object<EditMerchantRequest>({
+      id: s.string().check(s.maxLength(50)),
+      xGpVersion: s.defaulted(s.string().check(s.minLength(1), s.maxLength(50)), "2021-03-22"),
+      xGpIdempotency: s.optional(s.string().check(s.minLength(1), s.maxLength(50))),
+      body: s.optional(s.lazy(() => editRequestSchema)),
+    }),
+  );
+
+  export class EditMerchantError extends ApiError {
+    declare readonly payload:
+      | Declared<"objRequestInvalid400", ObjRequestInvalid400>
+      | Declared<"authenticationInvalid401", AuthenticationInvalid401>
+      | Declared<"notAuthorized403", NotAuthorized403>
+      | Declared<"error404", undefined>
+      | Declared<"serverError500", ServerError500>
+      | Declared<"unknownServerError501", UnknownServerError501>
+      | Declared<"unknownPlatformError502Authentications", UnknownPlatformError502Authentications>
+      | Declared<"serverTimeout504", ServerTimeout504>
+      | Undeclared;
+
+    static readonly errors: ErrorDecoders<EditMerchantError> = [
+      { on: 400, kind: "objRequestInvalid400", decode: { kind: "json", schema: objRequestInvalid400Schema } },
+      {
+        on: 401,
+        kind: "authenticationInvalid401",
+        decode: { kind: "json", schema: authenticationInvalid401Schema },
+      },
+      { on: 403, kind: "notAuthorized403", decode: { kind: "json", schema: notAuthorized403Schema } },
+      { on: 404, kind: "error404", decode: { kind: "empty" } },
+      { on: 500, kind: "serverError500", decode: { kind: "json", schema: serverError500Schema } },
+      {
+        on: 501,
+        kind: "unknownServerError501",
+        decode: { kind: "json", schema: unknownServerError501Schema },
+      },
+      {
+        on: 502,
+        kind: "unknownPlatformError502Authentications",
+        decode: { kind: "json", schema: unknownPlatformError502AuthenticationsSchema },
+      },
+      { on: 504, kind: "serverTimeout504", decode: { kind: "json", schema: serverTimeout504Schema } },
+    ];
+  }
+
+  export type GetMerchantSingleRequest = {
+    /** This is the merchant id to uniquely identify the entity on the Global Payments system. */
+    id: string;
+    /** The version of the API to execute the request. @default "2021-03-22" */
+    xGpVersion?: string;
+  };
+
+  export const getMerchantSingleRequestSchema: Schema<GetMerchantSingleRequest> = s.lazySchema(() =>
+    s.object<GetMerchantSingleRequest>({
+      id: s.string().check(s.maxLength(50)),
+      xGpVersion: s.defaulted(s.string().check(s.minLength(1), s.maxLength(50)), "2021-03-22"),
+    }),
+  );
+
+  export class GetMerchantSingleError extends ApiError {
+    declare readonly payload:
+      | Declared<"objRequestInvalid400", ObjRequestInvalid400>
+      | Declared<"authenticationInvalid401", AuthenticationInvalid401>
+      | Declared<"notAuthorized403", NotAuthorized403>
+      | Declared<"error404", undefined>
+      | Declared<"serverError500", ServerError500>
+      | Declared<"unknownServerError501", UnknownServerError501>
+      | Declared<"unknownPlatformError502Authentications", UnknownPlatformError502Authentications>
+      | Declared<"serverTimeout504", ServerTimeout504>
+      | Undeclared;
+
+    static readonly errors: ErrorDecoders<GetMerchantSingleError> = [
+      { on: 400, kind: "objRequestInvalid400", decode: { kind: "json", schema: objRequestInvalid400Schema } },
+      {
+        on: 401,
+        kind: "authenticationInvalid401",
+        decode: { kind: "json", schema: authenticationInvalid401Schema },
+      },
+      { on: 403, kind: "notAuthorized403", decode: { kind: "json", schema: notAuthorized403Schema } },
+      { on: 404, kind: "error404", decode: { kind: "empty" } },
+      { on: 500, kind: "serverError500", decode: { kind: "json", schema: serverError500Schema } },
+      {
+        on: 501,
+        kind: "unknownServerError501",
+        decode: { kind: "json", schema: unknownServerError501Schema },
+      },
+      {
+        on: 502,
+        kind: "unknownPlatformError502Authentications",
+        decode: { kind: "json", schema: unknownPlatformError502AuthenticationsSchema },
+      },
+      { on: 504, kind: "serverTimeout504", decode: { kind: "json", schema: serverTimeout504Schema } },
+    ];
+  }
+
+  export type GetMerchantsRequest = {
+    /** @default 1 */
+    page?: number;
+    /** @default 5 */
+    pageSize?: number;
+    id?: string;
+    status?: StatusMerchantsStatus;
+    name?: string;
+    fromTimeCreated?: string;
+    toTimeCreated?: string;
+    /** The version of the API to execute the request. @default "2021-03-22" */
+    xGpVersion?: string;
+    /**
+     * Integrator generated value submitted in the request header that is checked to ensure the same
+     * value has not been seen in the last 24 hours. It is used to ensure idempotency is maintained
+     * with this action.
+     */
+    xGpIdempotency?: string;
+  };
+
+  export const getMerchantsRequestSchema: Schema<GetMerchantsRequest> = s.lazySchema(() =>
+    s.object<GetMerchantsRequest>({
+      page: s.defaulted(s.float64(), 1),
+      pageSize: s.defaulted(s.float64().check(s.gte(1), s.lte(1000)), 5),
+      id: s.optional(s.string().check(s.maxLength(50))),
+      status: s.optional(s.lazy(() => statusMerchantsStatusSchema)),
+      name: s.optional(s.string().check(s.minLength(1), s.maxLength(100))),
+      fromTimeCreated: s.optional(s.dateOnly()),
+      toTimeCreated: s.optional(s.dateOnly()),
+      xGpVersion: s.defaulted(s.string().check(s.minLength(1), s.maxLength(50)), "2021-03-22"),
+      xGpIdempotency: s.optional(s.string().check(s.minLength(1), s.maxLength(50))),
+    }),
+  );
 
   export class GetMerchantsError extends ApiError {
-    declare readonly payload: ErrorPayload<Declared<"errorFourHundred1", ErrorFourHundred1>>;
+    declare readonly payload:
+      | Declared<"objRequestInvalid400", ObjRequestInvalid400>
+      | Declared<"authenticationInvalid401", AuthenticationInvalid401>
+      | Declared<"notAuthorized403", NotAuthorized403>
+      | Declared<"error404", undefined>
+      | Declared<"serverError500", ServerError500>
+      | Declared<"unknownServerError501", UnknownServerError501>
+      | Declared<"unknownPlatformError502Authentications", UnknownPlatformError502Authentications>
+      | Declared<"serverTimeout504", ServerTimeout504>
+      | Undeclared;
 
     static readonly errors: ErrorDecoders<GetMerchantsError> = [
-      { on: 400, kind: "errorFourHundred1", decode: { kind: "json", schema: errorFourHundred1Schema } },
+      { on: 400, kind: "objRequestInvalid400", decode: { kind: "json", schema: objRequestInvalid400Schema } },
+      {
+        on: 401,
+        kind: "authenticationInvalid401",
+        decode: { kind: "json", schema: authenticationInvalid401Schema },
+      },
+      { on: 403, kind: "notAuthorized403", decode: { kind: "json", schema: notAuthorized403Schema } },
+      { on: 404, kind: "error404", decode: { kind: "empty" } },
+      { on: 500, kind: "serverError500", decode: { kind: "json", schema: serverError500Schema } },
+      {
+        on: 501,
+        kind: "unknownServerError501",
+        decode: { kind: "json", schema: unknownServerError501Schema },
+      },
+      {
+        on: 502,
+        kind: "unknownPlatformError502Authentications",
+        decode: { kind: "json", schema: unknownPlatformError502AuthenticationsSchema },
+      },
+      { on: 504, kind: "serverTimeout504", decode: { kind: "json", schema: serverTimeout504Schema } },
     ];
   }
 
-  export type GetMerchantsIdRequest = {
-    /** The ID of this resource, also known as the Merchant ID (MID). */
+  export type UploadMerchantDocumentationRequest = {
+    /** This is the merchant id to uniquely identify the entity on the Global Payments system. */
     id: string;
+    /** The version of the API to execute the request. @default "2021-03-22" */
+    xGpVersion?: string;
     /**
-     * Use the embed query parameter to include full object(s) of related resource(s) directly
-     * within the API response. This allows retrieval of associated resources in a single request,
-     * reducing the need for multiple round-trips. Format: GET
-     * https://{server}.payrix.com/{endpoint}?embed={relatedObject}
+     * Integrator generated value submitted in the request header that is checked to ensure the same
+     * value has not been seen in the last 24 hours. It is used to ensure idempotency is maintained
+     * with this action.
      */
-    embed?: string;
-    /**
-     * A single-use, limited authentication layer in addition to an API Key or Session Key to
-     * authorize sensitive operations. <a
-     * href="https://docs.worldpay.com/apis/payrix/dev-int-guide/references/authentication/auth-tokens"
-     * target="_blank">Auth Tokens</a> add security by requiring one-time approval for specific
-     * actions.
-     */
-    token?: string;
-    /**
-     * A custom, one-time identifier for any API request (GET, PUT, POST, or DELETE). Blocks future
-     * requests with the same token for 48 hours, ensuring only the first request is processed.
-     * Valid values can contain 1-100 alphanumeric and special characters. See <a
-     * href="https://docs.worldpay.com/apis/payrix/dev-int-guide/references/authentication/request-tokens"
-     * target="_blank">Request Tokens</a> for more information.
-     */
-    requestToken?: string;
+    xGpIdempotency?: string;
+    body?: DocumentsRequest2;
   };
 
-  export class GetMerchantsIdError extends ApiError {
-    declare readonly payload: ErrorPayload<Declared<"errorFourHundred1", ErrorFourHundred1>>;
+  export const uploadMerchantDocumentationRequestSchema: Schema<UploadMerchantDocumentationRequest> =
+    s.lazySchema(() =>
+      s.object<UploadMerchantDocumentationRequest>({
+        id: s.string().check(s.maxLength(50)),
+        xGpVersion: s.defaulted(s.string().check(s.minLength(1), s.maxLength(50)), "2021-03-22"),
+        xGpIdempotency: s.optional(s.string().check(s.minLength(1), s.maxLength(50))),
+        body: s.optional(s.lazy(() => documentsRequest2Schema)),
+      }),
+    );
 
-    static readonly errors: ErrorDecoders<GetMerchantsIdError> = [
-      { on: 400, kind: "errorFourHundred1", decode: { kind: "json", schema: errorFourHundred1Schema } },
-    ];
-  }
+  export class UploadMerchantDocumentationError extends ApiError {
+    declare readonly payload:
+      | Declared<"objRequestInvalid400", ObjRequestInvalid400>
+      | Declared<"authenticationInvalid401", AuthenticationInvalid401>
+      | Declared<"notAuthorized403", NotAuthorized403>
+      | Declared<"error404", undefined>
+      | Declared<"serverError500", ServerError500>
+      | Declared<"unknownServerError501", UnknownServerError501>
+      | Declared<"unknownPlatformError502Authentications", UnknownPlatformError502Authentications>
+      | Declared<"serverTimeout504", ServerTimeout504>
+      | Undeclared;
 
-  export type PutMerchantsIdRequest = {
-    /** The ID of this resource, also known as the Merchant ID (MID). */
-    id: string;
-    /**
-     * A single-use, limited authentication layer in addition to an API Key or Session Key to
-     * authorize sensitive operations. <a
-     * href="https://docs.worldpay.com/apis/payrix/dev-int-guide/references/authentication/auth-tokens"
-     * target="_blank">Auth Tokens</a> add security by requiring one-time approval for specific
-     * actions.
-     */
-    token?: string;
-    /**
-     * A custom, one-time identifier for any API request (GET, PUT, POST, or DELETE). Blocks future
-     * requests with the same token for 48 hours, ensuring only the first request is processed.
-     * Valid values can contain 1-100 alphanumeric and special characters. See <a
-     * href="https://docs.worldpay.com/apis/payrix/dev-int-guide/references/authentication/request-tokens"
-     * target="_blank">Request Tokens</a> for more information.
-     */
-    requestToken?: string;
-    /** Update Merchant Request */
-    body: MerchantsPutRequest;
-  };
-
-  export class PutMerchantsIdError extends ApiError {
-    declare readonly payload: ErrorPayload<Declared<"errorFourHundred1", ErrorFourHundred1>>;
-
-    static readonly errors: ErrorDecoders<PutMerchantsIdError> = [
-      { on: 400, kind: "errorFourHundred1", decode: { kind: "json", schema: errorFourHundred1Schema } },
+    static readonly errors: ErrorDecoders<UploadMerchantDocumentationError> = [
+      { on: 400, kind: "objRequestInvalid400", decode: { kind: "json", schema: objRequestInvalid400Schema } },
+      {
+        on: 401,
+        kind: "authenticationInvalid401",
+        decode: { kind: "json", schema: authenticationInvalid401Schema },
+      },
+      { on: 403, kind: "notAuthorized403", decode: { kind: "json", schema: notAuthorized403Schema } },
+      { on: 404, kind: "error404", decode: { kind: "empty" } },
+      { on: 500, kind: "serverError500", decode: { kind: "json", schema: serverError500Schema } },
+      {
+        on: 501,
+        kind: "unknownServerError501",
+        decode: { kind: "json", schema: unknownServerError501Schema },
+      },
+      {
+        on: 502,
+        kind: "unknownPlatformError502Authentications",
+        decode: { kind: "json", schema: unknownPlatformError502AuthenticationsSchema },
+      },
+      { on: 504, kind: "serverTimeout504", decode: { kind: "json", schema: serverTimeout504Schema } },
     ];
   }
 }

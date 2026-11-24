@@ -1,3 +1,4 @@
+import type { HttpMethod } from "./api-request.js";
 import {
   attachmentDisposition,
   concatStream,
@@ -7,15 +8,13 @@ import {
   type FileInput,
   type ResolvedFile,
 } from "./binary.js";
+import { EncodeError } from "./errors.js";
 import type { Param, ParamValue, StyledParam } from "./param-value.js";
-import { flattenParams, isScalar, jsonValue, scalar } from "./param-value.js";
+import { flatten, isScalar, jsonValue, scalar } from "./param-value.js";
 import { formString } from "./params.js";
-import type { Entry } from "./validation/schema.js";
-import { encodeEntry } from "./validation/schema-error.js";
-
-export type Json = string | number | boolean | null | readonly Json[] | JsonObject;
-
-export type JsonObject = { readonly [key: string]: Json | undefined };
+import { uuid } from "./uuid.js";
+import { encodeEntry, type Entry } from "./validation/schema.js";
+import { SchemaError } from "./validation/schema-error.js";
 
 export type ContentType =
   | "application/x-www-form-urlencoded;charset=UTF-8"
@@ -84,18 +83,23 @@ export type BinaryBody = {
 
 export type RequestBody = EmptyBody | JsonBody | FormUrlEncodedBody | TextBody | MultipartBody | BinaryBody;
 
-export function buildBody(body: RequestBody, signal?: AbortSignal): BodyContent {
+export function buildBody(
+  method: HttpMethod,
+  uri: string,
+  body: RequestBody,
+  signal?: AbortSignal,
+): BodyContent {
   switch (body.kind) {
     case "empty":
       return { body: null };
     case "json":
-      return buildJson(body);
+      return buildJson(body, method, uri);
     case "formUrlEncoded":
-      return buildFormUrlEncoded(body);
+      return buildFormUrlEncoded(body, method, uri);
     case "text":
-      return buildText(body);
+      return buildText(body, method, uri);
     case "multipart":
-      return buildMultipart(body, signal);
+      return buildMultipart(body, signal, method, uri);
     case "binary":
       return buildBinary(body, signal);
     default:
@@ -108,12 +112,33 @@ function unknownBodyKind(body: never): never {
   throw new TypeError(`Unsupported request body kind: ${String(kind)}`);
 }
 
-function buildFormUrlEncoded(body: FormUrlEncodedBody): BodyContent {
-  return { body: formString(body.value), contentType: "application/x-www-form-urlencoded;charset=UTF-8" };
+function encodeFailure(err: unknown, method: HttpMethod, uri: string): EncodeError {
+  if (!(err instanceof SchemaError)) throw err;
+  return new EncodeError(`${method} ${uri} failed: Request value could not be encoded.`, {
+    cause: err,
+    method,
+    uri,
+  });
 }
 
-function buildJson(body: JsonBody): BodyContent {
-  const text = JSON.stringify(encodeEntry(body.schema, body.value));
+function buildFormUrlEncoded(body: FormUrlEncodedBody, method: HttpMethod, uri: string): BodyContent {
+  let text: string;
+  try {
+    text = formString(body.value);
+  } catch (err) {
+    throw encodeFailure(err, method, uri);
+  }
+  return { body: text, contentType: "application/x-www-form-urlencoded;charset=UTF-8" };
+}
+
+function buildJson(body: JsonBody, method: HttpMethod, uri: string): BodyContent {
+  let encoded: unknown;
+  try {
+    encoded = encodeEntry(body.schema, body.value);
+  } catch (err) {
+    throw encodeFailure(err, method, uri);
+  }
+  const text = JSON.stringify(encoded);
   if (text === undefined) return { body: null };
   return { body: text, contentType: "application/json" };
 }
@@ -130,8 +155,13 @@ function buildBinary(body: BinaryBody, signal: AbortSignal | undefined): BodyCon
   return content;
 }
 
-function buildText(body: TextBody): BodyContent {
-  const encoded = encodeEntry(body.schema, body.value) as ParamValue;
+function buildText(body: TextBody, method: HttpMethod, uri: string): BodyContent {
+  let encoded: ParamValue;
+  try {
+    encoded = encodeEntry(body.schema, body.value) as ParamValue;
+  } catch (err) {
+    throw encodeFailure(err, method, uri);
+  }
   if (encoded === undefined) return { body: null };
   return {
     body: isScalar(encoded) ? scalar(encoded) : jsonValue(encoded),
@@ -144,11 +174,21 @@ type MultipartEntry<File extends ResolvedFile = ResolvedFile> =
   | { readonly kind: "json"; readonly name: string; readonly value: string; readonly contentType: string }
   | { readonly kind: "file"; readonly name: string; readonly file: File };
 
-function buildMultipart(body: MultipartBody, signal: AbortSignal | undefined): BodyContent {
-  const entries = body.value.flatMap(partEntries);
+function buildMultipart(
+  body: MultipartBody,
+  signal: AbortSignal | undefined,
+  method: HttpMethod,
+  uri: string,
+): BodyContent {
+  let entries: readonly MultipartEntry[];
+  try {
+    entries = body.value.flatMap(partEntries);
+  } catch (err) {
+    throw encodeFailure(err, method, uri);
+  }
   if (allBuffered(entries)) return { body: toFormData(entries) };
 
-  const boundary = `----${crypto.randomUUID()}`;
+  const boundary = `----${uuid()}`;
   return {
     body: frameMultipart(entries, boundary, signal),
     contentType: `multipart/form-data; boundary=${boundary}`,
@@ -159,7 +199,7 @@ function buildMultipart(body: MultipartBody, signal: AbortSignal | undefined): B
 function partEntries(part: MultipartPart): readonly MultipartEntry[] {
   switch (part.kind) {
     case "text":
-      return flattenParams([part]).map(([name, value]) => ({ kind: "text", name, value }));
+      return flatten([part]).map(([name, value]) => ({ kind: "text", name, value }));
     case "json": {
       const encoded = encodeEntry(part.schema, part.value);
       const entries: MultipartEntry[] = [];

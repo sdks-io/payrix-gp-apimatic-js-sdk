@@ -5,42 +5,88 @@ import type {
   OAuthToken,
   OAuthTokenRefreshable,
 } from "./oauth2-strategies.js";
-import { header, noneAuth } from "./schemes.js";
+import { header, unconfiguredAuth } from "./schemes.js";
 
 const EXPIRY_BUFFER_MS = 30_000;
 
-export function oauth2Scheme<TCredentials>(
+export type ScopedAuthScheme = AuthScheme & {
+  forScopes(...scopes: readonly string[]): AuthScheme;
+};
+
+type ScopedCredentials = { readonly scope?: string | undefined };
+
+export function oauth2Scheme<TCredentials extends ScopedCredentials>(
+  scheme: string,
   credentials: TCredentials | undefined,
   strategy: OAuth2TokenStrategy<TCredentials>,
-): AuthScheme {
-  if (credentials === undefined) return noneAuth;
-  return cachedTokenScheme((signal) => strategy.getToken(credentials, signal));
+): ScopedAuthScheme {
+  if (credentials === undefined) return ignoringScopes(unconfiguredAuth(scheme));
+
+  const unscoped = cachedTokenScheme((signal) => strategy.getToken(credentials, signal, credentials.scope));
+  if (hasScope(credentials.scope)) return ignoringScopes(unscoped);
+
+  const slots = new Map<string, AuthScheme>();
+  const scoped: ScopedAuthScheme = {
+    ...unscoped,
+    forScopes(...scopes) {
+      if (scopes.length === 0) return scoped;
+      const scope = [...scopes].sort().join(" ");
+      let slot = slots.get(scope);
+      if (slot === undefined) {
+        slot = cachedTokenScheme((signal) => strategy.getToken(credentials, signal, scope));
+        slots.set(scope, slot);
+      }
+      return slot;
+    },
+  };
+  return scoped;
 }
 
-export function oauth2RefreshableScheme<TCredentials>(
+export function oauth2RefreshableScheme<TCredentials extends ScopedCredentials>(
+  scheme: string,
   credentials: TCredentials | undefined,
   strategy: OAuth2RefreshableTokenStrategy<TCredentials>,
+  scope?: string,
 ): AuthScheme {
-  if (credentials === undefined) return noneAuth;
-  return cachedTokenScheme<OAuthTokenRefreshable>(async (signal, previous) => {
-    const refreshToken = previous?.refreshToken;
-    if (refreshToken === undefined) return strategy.getToken(credentials, signal);
+  if (credentials === undefined) return unconfiguredAuth(scheme);
 
-    const refreshed = await strategy.tryRefreshToken(credentials, refreshToken, signal);
-    if (refreshed === null) return strategy.getToken(credentials, signal);
-    return refreshed.refreshToken === undefined ? { ...refreshed, refreshToken } : refreshed;
+  let refreshToken: string | undefined;
+  const remember = (token: OAuthTokenRefreshable): OAuthTokenRefreshable => {
+    refreshToken = token.refreshToken ?? undefined;
+    return token;
+  };
+
+  return cachedTokenScheme(async (signal) => {
+    const requested = hasScope(credentials.scope) ? credentials.scope : scope;
+    const previous = refreshToken;
+    if (previous === undefined) return remember(await strategy.getToken(credentials, signal, requested));
+
+    const refreshed = await strategy.tryRefreshToken(credentials, previous, signal, requested);
+    if (refreshed === null) {
+      refreshToken = undefined;
+      return remember(await strategy.getToken(credentials, signal, requested));
+    }
+    return remember({ ...refreshed, refreshToken: refreshed.refreshToken ?? previous });
   });
 }
 
+function ignoringScopes(scheme: AuthScheme): ScopedAuthScheme {
+  const scoped: ScopedAuthScheme = { ...scheme, forScopes: () => scoped };
+  return scoped;
+}
+
 function cachedTokenScheme<TToken extends OAuthToken>(
-  acquire: (signal?: AbortSignal, previous?: TToken) => Promise<TToken>,
+  acquire: (signal: AbortSignal) => Promise<TToken>,
 ): AuthScheme {
   let cached: { token: TToken; expiresAt: number } | undefined;
   let inflight: Promise<TToken> | undefined;
+  let retired: string | undefined;
 
-  async function obtainAndCacheToken(signal?: AbortSignal): Promise<TToken> {
+  async function obtainAndCacheToken(signal: AbortSignal): Promise<TToken> {
     try {
-      const token = await acquire(signal, cached?.token);
+      const acquired = await acquire(signal);
+      const token = { ...acquired, accessToken: acquired.accessToken.trim() };
+      if (cached !== undefined) retired = authorization(cached.token);
       cached = { token, expiresAt: expiryOf(token) };
       return token;
     } finally {
@@ -54,15 +100,19 @@ function cachedTokenScheme<TToken extends OAuthToken>(
       inflight ??= obtainAndCacheToken(signal);
       return bearer(await untilAborted(inflight, signal));
     },
-    hasCredentials: () => true,
-    invalidate: () => {
-      cached = undefined;
+    missingCredentials: () => [],
+    invalidate(rejected) {
+      if (cached !== undefined && rejected === authorization(cached.token)) {
+        retired = rejected;
+        cached = undefined;
+        return true;
+      }
+      return rejected !== null && rejected === retired;
     },
   };
 }
 
-function untilAborted<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
-  if (signal === undefined) return promise;
+function untilAborted<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const onAbort = (): void => reject(signal.reason);
     signal.addEventListener("abort", onAbort, { once: true });
@@ -72,10 +122,19 @@ function untilAborted<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> 
 }
 
 function bearer(token: OAuthToken): AuthParams {
-  return header("Authorization", `Bearer ${token.accessToken}`);
+  return header("Authorization", authorization(token));
+}
+
+function authorization(token: OAuthToken): string {
+  return `Bearer ${token.accessToken}`;
+}
+
+function hasScope(scope: string | undefined): scope is string {
+  return scope !== undefined && scope !== "";
 }
 
 function expiryOf(token: OAuthToken): number {
   if (token.expiresIn === undefined || token.expiresIn <= 0) return Number.POSITIVE_INFINITY;
-  return Date.now() + token.expiresIn * 1000 - EXPIRY_BUFFER_MS;
+  const lifetimeMs = token.expiresIn * 1000;
+  return Date.now() + Math.max(lifetimeMs - EXPIRY_BUFFER_MS, lifetimeMs / 2);
 }
