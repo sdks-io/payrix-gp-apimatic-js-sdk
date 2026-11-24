@@ -59,7 +59,7 @@ export type LinksResponse2 = {
   /** Indicates the number of times that a link has already been successfully paid. */
   usageCount?: string;
   /** The number of times a link has been viewed. */
-  viewedCount?: number;
+  viewedCount?: string;
   /**
    * Indicates the date and time after which the link can no longer be used or paid. Please note
    * that the timezone is in UTC+0
@@ -93,7 +93,7 @@ const linksResponse2Properties: s.Shape<LinksResponse2> = {
   shippable: s.optional(s.lazy(() => shippableLinksShippableSchema)),
   shippingAmount: s.optional(s.string()),
   usageCount: s.optional(s.string()),
-  viewedCount: s.optional(s.float64()),
+  viewedCount: s.optional(s.string()),
   expirationDate: s.optional(s.string()),
   images: s.optional(s.array(s.string())),
   transactions: s.optional(s.array(s.lazy(() => transactions2InternalSchema))),
