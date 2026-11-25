@@ -1,7 +1,7 @@
 import * as s from "../core/validation/index.js";
 import type { JsonValue, Schema } from "../core/validation/schema.js";
 import { action112InternalSchema, action112Schema, type Action112 } from "./action112.js";
-import { filter1Schema, type Filter1 } from "./filter1.js";
+import { filter27Schema, type Filter27 } from "./filter27.js";
 import { link3InternalSchema, link3Schema, type Link3 } from "./link3.js";
 import { paging3InternalSchema, paging3Schema, type Paging3 } from "./paging3.js";
 
@@ -25,7 +25,7 @@ export type LinksResponse = {
   accountId?: string;
   /** A meaningful label for the merchant account set by Global Payments. */
   accountName?: string;
-  filter?: Filter1;
+  filter?: Filter27;
   paging?: Paging3;
   links?: Link3[];
   action?: Action112;
@@ -40,7 +40,7 @@ const linksResponseProperties: s.Shape<LinksResponse> = {
   merchantName: s.optional(s.string()),
   accountId: s.optional(s.string()),
   accountName: s.optional(s.string()),
-  filter: s.optional(s.lazy(() => filter1Schema)),
+  filter: s.optional(s.lazy(() => filter27Schema)),
   paging: s.optional(s.lazy(() => paging3InternalSchema)),
   links: s.optional(s.array(s.lazy(() => link3InternalSchema))),
   action: s.optional(s.lazy(() => action112InternalSchema)),

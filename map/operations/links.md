@@ -74,8 +74,8 @@ Accessor: `client.links` · Source: `src/resources/links.ts` · 3 operations · 
 
 | Field | Channel | Wire | Type | Req | Default |
 | --- | --- | --- | --- | --- | --- |
-| `fromTimeCreated` | `query` | `from_time_created` | `string` (date) | no | — |
-| `toTimeCreated` | `query` | `to_time_created` | `string` (date) | no | — |
+| `fromTimeCreated` | `query` | `from_time_created` | `Date` (date-time) | no | — |
+| `toTimeCreated` | `query` | `to_time_created` | `Date` (date-time) | no | — |
 | `id` | `query` | — | `string` | no | — |
 | `status` | `query` | — | `StatusLinksStatus` | no | — |
 | `usageMode` | `query` | `usage_mode` | `UsageModeLinksUsageMode` | no | — |

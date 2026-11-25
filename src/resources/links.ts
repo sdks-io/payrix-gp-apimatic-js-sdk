@@ -178,8 +178,8 @@ export class Links {
         auth: this.#auth.bearerAuth,
         pathParams: [],
         query: [
-          { name: "from_time_created", value: request.fromTimeCreated, schema: s.optional(s.dateOnly()) },
-          { name: "to_time_created", value: request.toTimeCreated, schema: s.optional(s.dateOnly()) },
+          { name: "from_time_created", value: request.fromTimeCreated, schema: s.optional(s.dateTime()) },
+          { name: "to_time_created", value: request.toTimeCreated, schema: s.optional(s.dateTime()) },
           { name: "id", value: request.id, schema: s.optional(s.string()) },
           {
             name: "status",
@@ -302,8 +302,8 @@ export namespace Links {
   }
 
   export type GetListOfLinksRequest = {
-    fromTimeCreated?: string;
-    toTimeCreated?: string;
+    fromTimeCreated?: Date;
+    toTimeCreated?: Date;
     id?: string;
     status?: StatusLinksStatus;
     usageMode?: UsageModeLinksUsageMode;
@@ -334,8 +334,8 @@ export namespace Links {
 
   export const getListOfLinksRequestSchema: Schema<GetListOfLinksRequest> = s.lazySchema(() =>
     s.object<GetListOfLinksRequest>({
-      fromTimeCreated: s.optional(s.dateOnly()),
-      toTimeCreated: s.optional(s.dateOnly()),
+      fromTimeCreated: s.optional(s.dateTime()),
+      toTimeCreated: s.optional(s.dateTime()),
       id: s.optional(s.string()),
       status: s.optional(s.lazy(() => statusLinksStatusSchema)),
       usageMode: s.optional(s.lazy(() => usageModeLinksUsageModeSchema)),

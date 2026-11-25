@@ -4236,8 +4236,8 @@ Please contact Global Payments before coding this feature to confirm it will be 
 ```ts
 try {
   const response = await client.links.getListOfLinks({
-    fromTimeCreated: "2022-05-01",
-    toTimeCreated: "2023-05-01",
+    fromTimeCreated: new Date(Date.UTC(2026, 8, 22, 0, 0, 0)),
+    toTimeCreated: new Date(Date.UTC(2026, 8, 23, 0, 0, 0)),
     id: "LNK_bnqlo0LgbMt221TczxF70Awdg7c5ez",
     status: StatusLinksStatus.Active,
     usageMode: UsageModeLinksUsageMode.Single,
@@ -4271,8 +4271,8 @@ try {
 ```ts
 const result = await client.links
   .getListOfLinks({
-    fromTimeCreated: "2022-05-01",
-    toTimeCreated: "2023-05-01",
+    fromTimeCreated: new Date(Date.UTC(2026, 8, 22, 0, 0, 0)),
+    toTimeCreated: new Date(Date.UTC(2026, 8, 23, 0, 0, 0)),
     id: "LNK_bnqlo0LgbMt221TczxF70Awdg7c5ez",
     status: StatusLinksStatus.Active,
     usageMode: UsageModeLinksUsageMode.Single,
@@ -4308,8 +4308,8 @@ if (result.ok) {
 
 | Name | Type | Description |
 | --- | --- | --- |
-| <code>fromTimeCreated?</code> | <code>string</code> (date) | - |
-| <code>toTimeCreated?</code> | <code>string</code> (date) | - |
+| <code>fromTimeCreated?</code> | <code>Date</code> (date-time) | - |
+| <code>toTimeCreated?</code> | <code>Date</code> (date-time) | - |
 | <code>id?</code> | <code>string</code> | - |
 | <code>status?</code> | <code>[StatusLinksStatus](src/models/status-links-status.ts)</code> | - |
 | <code>usageMode?</code> | <code>[UsageModeLinksUsageMode](src/models/usage-mode-links-usage-mode.ts)</code> | - |
