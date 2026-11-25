@@ -318,7 +318,7 @@ Each page below carries one block per operation, with bullets in the fixed order
 
 | Group | Count | Directory |
 | --- | --- | --- |
-| Objects (plain `type`, no class) | 949 | `src/models/` |
+| Objects (plain `type`, no class) | 951 | `src/models/` |
 | Enums (open; const companion plus schema) | 459 | `src/models/` |
 | Unions | 3 | `src/models/unions/` |
 | Typed error classes (`ApiError` subclass, one per typed operation) | 80 | `src/resources/`, in the declaring module's namespace |

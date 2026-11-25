@@ -19,6 +19,7 @@ import {
   netFinancialFundingDisputesNetFinancialFundingSchema,
   type NetFinancialFundingDisputesNetFinancialFunding,
 } from "./net-financial-funding-disputes-net-financial-funding.js";
+import { order65Schema, type Order65 } from "./order65.js";
 import {
   paymentMethodProvider1InternalSchema,
   paymentMethodProvider1Schema,
@@ -158,6 +159,7 @@ export type DisputesResponse1 = {
   documents?: Documents2[];
   device?: Device2;
   action?: Action24;
+  order?: Order65;
   /** Properties the service sent or accepts beyond those declared. */
   additionalProperties?: Record<string, JsonValue>;
 };
@@ -206,6 +208,7 @@ const disputesResponse1Properties: s.Shape<DisputesResponse1> = {
   documents: s.optional(s.array(s.lazy(() => documents2InternalSchema))),
   device: s.optional(s.lazy(() => device2Schema)),
   action: s.optional(s.lazy(() => action24InternalSchema)),
+  order: s.optional(s.lazy(() => order65Schema)),
   _keysMap: {
     merchantId: "merchant_id",
     merchantName: "merchant_name",

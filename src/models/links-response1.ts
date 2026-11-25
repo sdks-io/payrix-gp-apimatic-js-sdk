@@ -1,7 +1,7 @@
 import * as s from "../core/validation/index.js";
 import type { JsonValue, Schema } from "../core/validation/schema.js";
 import { action112InternalSchema, action112Schema, type Action112 } from "./action112.js";
-import { order72InternalSchema, order72Schema, type Order72 } from "./order72.js";
+import { order74InternalSchema, order74Schema, type Order74 } from "./order74.js";
 import { shippableLinksShippableSchema, type ShippableLinksShippable } from "./shippable-links-shippable.js";
 import { statusLinksStatusSchema, type StatusLinksStatus } from "./status-links-status.js";
 import { transactions1InternalSchema, transactions1Schema, type Transactions1 } from "./transactions1.js";
@@ -68,7 +68,7 @@ export type LinksResponse1 = {
    */
   expirationDate?: string;
   transactions?: Transactions1;
-  order?: Order72;
+  order?: Order74;
   /**
    * Base64 encoded images of the products / services that you want to display on the hosted payment
    * page.
@@ -97,7 +97,7 @@ const linksResponse1Properties: s.Shape<LinksResponse1> = {
   viewedCount: s.optional(s.float64()),
   expirationDate: s.optional(s.string()),
   transactions: s.optional(s.lazy(() => transactions1InternalSchema)),
-  order: s.optional(s.lazy(() => order72InternalSchema)),
+  order: s.optional(s.lazy(() => order74InternalSchema)),
   images: s.optional(s.array(s.string())),
   action: s.optional(s.lazy(() => action112InternalSchema)),
   _keysMap: {
@@ -125,7 +125,7 @@ export const linksResponse1Schema: Schema<LinksResponse1> = s.lazySchema(() =>
       description: s.optional(s.string().check(s.minLength(1), s.maxLength(250))),
       name: s.optional(s.string().check(s.minLength(1), s.maxLength(120))),
       transactions: s.optional(s.lazy(() => transactions1Schema)),
-      order: s.optional(s.lazy(() => order72Schema)),
+      order: s.optional(s.lazy(() => order74Schema)),
       action: s.optional(s.lazy(() => action112Schema)),
     },
     { additionalProperties: s.json() },

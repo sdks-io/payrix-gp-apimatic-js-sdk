@@ -6,11 +6,7 @@ import {
   disputesFilterSchema,
   type DisputesFilter,
 } from "./disputes-filter.js";
-import {
-  disputesListItemInternalSchema,
-  disputesListItemSchema,
-  type DisputesListItem,
-} from "./disputes-list-item.js";
+import { disputes2InternalSchema, disputes2Schema, type Disputes2 } from "./disputes2.js";
 import { paging16InternalSchema, paging16Schema, type Paging16 } from "./paging16.js";
 
 export type DisputesResponse = {
@@ -36,7 +32,7 @@ export type DisputesResponse = {
   filter?: DisputesFilter;
   paging?: Paging16;
   /** A list of disputes */
-  disputes?: DisputesListItem[];
+  disputes?: Disputes2[];
   action?: Action24;
   /** Properties the service sent or accepts beyond those declared. */
   additionalProperties?: Record<string, JsonValue>;
@@ -51,7 +47,7 @@ const disputesResponseProperties: s.Shape<DisputesResponse> = {
   accountName: s.optional(s.string()),
   filter: s.optional(s.lazy(() => disputesFilterInternalSchema)),
   paging: s.optional(s.lazy(() => paging16InternalSchema)),
-  disputes: s.optional(s.array(s.lazy(() => disputesListItemInternalSchema))),
+  disputes: s.optional(s.array(s.lazy(() => disputes2InternalSchema))),
   action: s.optional(s.lazy(() => action24InternalSchema)),
   _keysMap: {
     totalRecordCount: "total_record_count",
@@ -78,7 +74,7 @@ export const disputesResponseSchema: Schema<DisputesResponse> = s.lazySchema(() 
       accountName: s.optional(s.string().check(s.minLength(1), s.maxLength(50))),
       filter: s.optional(s.lazy(() => disputesFilterSchema)),
       paging: s.optional(s.lazy(() => paging16Schema)),
-      disputes: s.optional(s.array(s.lazy(() => disputesListItemSchema))),
+      disputes: s.optional(s.array(s.lazy(() => disputes2Schema))),
       action: s.optional(s.lazy(() => action24Schema)),
     },
     { additionalProperties: s.json() },

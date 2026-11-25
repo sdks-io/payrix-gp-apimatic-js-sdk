@@ -6,7 +6,7 @@ import {
   type TransactionConfiguration1,
 } from "./transaction-configuration1.js";
 
-export type Order72 = {
+export type Order74 = {
   /**
    * The amount to transfer between Payer and Merchant for a SALE or a REFUND. It is always
    * represented in the lowest denomination of the related currency. and with no decimal point.
@@ -21,7 +21,7 @@ export type Order72 = {
   additionalProperties?: Record<string, JsonValue>;
 };
 
-const order72Properties: s.Shape<Order72> = {
+const order74Properties: s.Shape<Order74> = {
   amount: s.optional(s.string()),
   currency: s.optional(s.string()),
   reference: s.optional(s.string()),
@@ -31,14 +31,14 @@ const order72Properties: s.Shape<Order72> = {
   },
 };
 
-export const order72InternalSchema: Schema<Order72> = s.object<Order72>(order72Properties, {
+export const order74InternalSchema: Schema<Order74> = s.object<Order74>(order74Properties, {
   additionalProperties: s.json(),
 });
 
-export const order72Schema: Schema<Order72> = s.lazySchema(() =>
-  s.object<Order72>(
+export const order74Schema: Schema<Order74> = s.lazySchema(() =>
+  s.object<Order74>(
     {
-      ...order72Properties,
+      ...order74Properties,
       amount: s.optional(s.string().check(s.minLength(1), s.maxLength(50))),
       currency: s.optional(s.string().check(s.minLength(3), s.maxLength(3))),
       reference: s.optional(s.string().check(s.minLength(1), s.maxLength(50))),

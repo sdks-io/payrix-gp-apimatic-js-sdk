@@ -13,7 +13,7 @@ import {
   notifications19Schema,
   type Notifications19,
 } from "./notifications19.js";
-import { order71InternalSchema, order71Schema, type Order71 } from "./order71.js";
+import { order73InternalSchema, order73Schema, type Order73 } from "./order73.js";
 import { payer13InternalSchema, payer13Schema, type Payer13 } from "./payer13.js";
 import { shippableLinksShippableSchema, type ShippableLinksShippable } from "./shippable-links-shippable.js";
 import { transactionsInternalSchema, transactionsSchema, type Transactions } from "./transactions.js";
@@ -117,7 +117,7 @@ export type LinksRequest = {
   /** Indicates the delivery method of the link notification */
   messageType?: MessageTypeLinksMessageType;
   payer?: Payer13;
-  order?: Order71;
+  order?: Order73;
   notifications?: Notifications19;
   installment?: Installment5;
   images?: Images;
@@ -148,7 +148,7 @@ const linksRequestProperties: s.Shape<LinksRequest> = {
   expirationDate: s.optional(s.string()),
   messageType: s.optional(s.lazy(() => messageTypeLinksMessageTypeSchema)),
   payer: s.optional(s.lazy(() => payer13InternalSchema)),
-  order: s.optional(s.lazy(() => order71InternalSchema)),
+  order: s.optional(s.lazy(() => order73InternalSchema)),
   notifications: s.optional(s.lazy(() => notifications19InternalSchema)),
   installment: s.optional(s.lazy(() => installment5InternalSchema)),
   images: s.optional(s.lazy(() => imagesSchema)),
@@ -186,7 +186,7 @@ export const linksRequestSchema: Schema<LinksRequest> = s.lazySchema(() =>
       name: s.string().check(s.minLength(1), s.maxLength(120)),
       description: s.string().check(s.minLength(1), s.maxLength(250)),
       payer: s.optional(s.lazy(() => payer13Schema)),
-      order: s.optional(s.lazy(() => order71Schema)),
+      order: s.optional(s.lazy(() => order73Schema)),
       notifications: s.optional(s.lazy(() => notifications19Schema)),
       installment: s.optional(s.lazy(() => installment5Schema)),
     },
