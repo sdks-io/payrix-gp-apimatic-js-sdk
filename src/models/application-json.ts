@@ -2,7 +2,7 @@ import * as s from "../core/validation/index.js";
 import type { JsonValue, Schema } from "../core/validation/schema.js";
 import { action58InternalSchema, action58Schema, type Action58 } from "./action58.js";
 import { filter14Schema, type Filter14 } from "./filter14.js";
-import { paging3InternalSchema, paging3Schema, type Paging3 } from "./paging3.js";
+import { paging16InternalSchema, paging16Schema, type Paging16 } from "./paging16.js";
 import {
   settledDisputesListItemInternalSchema,
   settledDisputesListItemSchema,
@@ -30,7 +30,7 @@ export type ApplicationJson = {
   /** A meaningful label for the merchant account set by Global Payments. */
   accountName?: string;
   filter?: Filter14;
-  paging?: Paging3;
+  paging?: Paging16;
   /** A list of disputes */
   disputes?: SettledDisputesListItem[];
   action?: Action58;
@@ -46,7 +46,7 @@ const applicationJsonProperties: s.Shape<ApplicationJson> = {
   accountId: s.optional(s.string()),
   accountName: s.optional(s.string()),
   filter: s.optional(s.lazy(() => filter14Schema)),
-  paging: s.optional(s.lazy(() => paging3InternalSchema)),
+  paging: s.optional(s.lazy(() => paging16InternalSchema)),
   disputes: s.optional(s.array(s.lazy(() => settledDisputesListItemInternalSchema))),
   action: s.optional(s.lazy(() => action58InternalSchema)),
   _keysMap: {
@@ -72,7 +72,7 @@ export const applicationJsonSchema: Schema<ApplicationJson> = s.lazySchema(() =>
       merchantName: s.optional(s.string().check(s.minLength(1), s.maxLength(50))),
       accountId: s.optional(s.string().check(s.minLength(1), s.maxLength(50))),
       accountName: s.optional(s.string().check(s.minLength(1), s.maxLength(50))),
-      paging: s.optional(s.lazy(() => paging3Schema)),
+      paging: s.optional(s.lazy(() => paging16Schema)),
       disputes: s.optional(s.array(s.lazy(() => settledDisputesListItemSchema))),
       action: s.optional(s.lazy(() => action58Schema)),
     },

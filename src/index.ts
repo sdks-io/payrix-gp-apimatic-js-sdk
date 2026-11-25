@@ -967,6 +967,7 @@ export { order7Schema, type Order7 } from "./models/order7.js";
 export { order71Schema, type Order71 } from "./models/order71.js";
 export { order72Schema, type Order72 } from "./models/order72.js";
 export { OrderBy2, orderBy2Schema } from "./models/order-by2.js";
+export { paging16Schema, type Paging16 } from "./models/paging16.js";
 export { paging17Schema, type Paging17 } from "./models/paging17.js";
 export { paging18Schema, type Paging18 } from "./models/paging18.js";
 export { paging3Schema, type Paging3 } from "./models/paging3.js";
@@ -2444,6 +2445,7 @@ export {
   disputeSingleRealTimeSchema,
   type DisputeSingleRealTime,
 } from "./models/dispute-single-real-time.js";
+export { disputesFilterSchema, type DisputesFilter } from "./models/disputes-filter.js";
 export { disputesFilter3Schema, type DisputesFilter3 } from "./models/disputes-filter3.js";
 export { disputesListSchema, type DisputesList } from "./models/disputes-list.js";
 export { disputesListItemSchema, type DisputesListItem } from "./models/disputes-list-item.js";

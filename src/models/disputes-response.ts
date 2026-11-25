@@ -2,16 +2,16 @@ import * as s from "../core/validation/index.js";
 import type { JsonValue, Schema } from "../core/validation/schema.js";
 import { action24InternalSchema, action24Schema, type Action24 } from "./action24.js";
 import {
-  disputesFilter3InternalSchema,
-  disputesFilter3Schema,
-  type DisputesFilter3,
-} from "./disputes-filter3.js";
+  disputesFilterInternalSchema,
+  disputesFilterSchema,
+  type DisputesFilter,
+} from "./disputes-filter.js";
 import {
   disputesListItemInternalSchema,
   disputesListItemSchema,
   type DisputesListItem,
 } from "./disputes-list-item.js";
-import { paging3InternalSchema, paging3Schema, type Paging3 } from "./paging3.js";
+import { paging16InternalSchema, paging16Schema, type Paging16 } from "./paging16.js";
 
 export type DisputesResponse = {
   /**
@@ -33,8 +33,8 @@ export type DisputesResponse = {
   accountId?: string;
   /** A meaningful label for the merchant account set by Global Payments. */
   accountName?: string;
-  filter?: DisputesFilter3;
-  paging?: Paging3;
+  filter?: DisputesFilter;
+  paging?: Paging16;
   /** A list of disputes */
   disputes?: DisputesListItem[];
   action?: Action24;
@@ -49,8 +49,8 @@ const disputesResponseProperties: s.Shape<DisputesResponse> = {
   merchantName: s.optional(s.string()),
   accountId: s.optional(s.string()),
   accountName: s.optional(s.string()),
-  filter: s.optional(s.lazy(() => disputesFilter3InternalSchema)),
-  paging: s.optional(s.lazy(() => paging3InternalSchema)),
+  filter: s.optional(s.lazy(() => disputesFilterInternalSchema)),
+  paging: s.optional(s.lazy(() => paging16InternalSchema)),
   disputes: s.optional(s.array(s.lazy(() => disputesListItemInternalSchema))),
   action: s.optional(s.lazy(() => action24InternalSchema)),
   _keysMap: {
@@ -76,8 +76,8 @@ export const disputesResponseSchema: Schema<DisputesResponse> = s.lazySchema(() 
       merchantName: s.optional(s.string().check(s.minLength(1), s.maxLength(50))),
       accountId: s.optional(s.string().check(s.minLength(1), s.maxLength(50))),
       accountName: s.optional(s.string().check(s.minLength(1), s.maxLength(50))),
-      filter: s.optional(s.lazy(() => disputesFilter3Schema)),
-      paging: s.optional(s.lazy(() => paging3Schema)),
+      filter: s.optional(s.lazy(() => disputesFilterSchema)),
+      paging: s.optional(s.lazy(() => paging16Schema)),
       disputes: s.optional(s.array(s.lazy(() => disputesListItemSchema))),
       action: s.optional(s.lazy(() => action24Schema)),
     },

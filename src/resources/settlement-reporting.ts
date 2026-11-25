@@ -277,7 +277,11 @@ export class SettlementReporting {
             value: request.order,
             schema: s.optional(s.lazy(() => dataDictionaryV1PaginationOrderSchema)),
           },
-          { name: "order_by", value: request.orderBy, schema: s.defaulted(s.string(), "TIME_CREATED") },
+          {
+            name: "order_by",
+            value: request.orderBy,
+            schema: s.defaulted(s.string(), "FROM_STAGE_TIME_CREATED"),
+          },
           { name: "arn", value: request.arn, schema: s.optional(s.string()) },
           {
             name: "brand",
@@ -833,7 +837,7 @@ export namespace SettlementReporting {
     /** @default 5 */
     pageSize?: number;
     order?: DataDictionaryV1PaginationOrder;
-    /** @default "TIME_CREATED" */
+    /** @default "FROM_STAGE_TIME_CREATED" */
     orderBy?: string;
     arn?: string;
     brand?: BrandAuthenticationsPaymentMethodCardBrand;
@@ -865,7 +869,7 @@ export namespace SettlementReporting {
       page: s.defaulted(s.float64(), 1),
       pageSize: s.defaulted(s.float64().check(s.gte(1), s.lte(1000)), 5),
       order: s.optional(s.lazy(() => dataDictionaryV1PaginationOrderSchema)),
-      orderBy: s.defaulted(s.string(), "TIME_CREATED"),
+      orderBy: s.defaulted(s.string(), "FROM_STAGE_TIME_CREATED"),
       arn: s.optional(s.string().check(s.minLength(1), s.maxLength(50))),
       brand: s.optional(s.lazy(() => brandAuthenticationsPaymentMethodCardBrandSchema)),
       status: s.optional(s.lazy(() => statusSettlementDisputesStatusSchema)),

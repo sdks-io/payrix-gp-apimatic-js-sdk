@@ -130,7 +130,7 @@ Accessor: `client.settlementReporting` · Source: `src/resources/settlement-repo
 | `page` | `query` | — | `number` | no | `1` |
 | `pageSize` | `query` | `page_size` | `number` | no | `5` |
 | `order` | `query` | — | `DataDictionaryV1PaginationOrder` | no | — |
-| `orderBy` | `query` | `order_by` | `string` | no | `"TIME_CREATED"` |
+| `orderBy` | `query` | `order_by` | `string` | no | `"FROM_STAGE_TIME_CREATED"` |
 | `arn` | `query` | — | `string` | no | — |
 | `brand` | `query` | — | `BrandAuthenticationsPaymentMethodCardBrand` | no | — |
 | `status` | `query` | — | `StatusSettlementDisputesStatus` | no | — |

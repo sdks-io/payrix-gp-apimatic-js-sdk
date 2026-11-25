@@ -2813,7 +2813,7 @@ try {
     page: 1,
     pageSize: 5,
     order: DataDictionaryV1PaginationOrder.Asc,
-    orderBy: "TIME_CREATED",
+    orderBy: "FROM_STAGE_TIME_CREATED",
     brand: BrandAuthenticationsPaymentMethodCardBrand.Visa,
     status: StatusDisputesStatus.UnderReview,
     stage: StageDisputesStage.Retrieval,
@@ -2842,7 +2842,7 @@ const result = await client.disputesApi
     page: 1,
     pageSize: 5,
     order: DataDictionaryV1PaginationOrder.Asc,
-    orderBy: "TIME_CREATED",
+    orderBy: "FROM_STAGE_TIME_CREATED",
     brand: BrandAuthenticationsPaymentMethodCardBrand.Visa,
     status: StatusDisputesStatus.UnderReview,
     stage: StageDisputesStage.Retrieval,
@@ -2873,7 +2873,7 @@ if (result.ok) {
 | <code>page?</code> | <code>number</code> | -<br>**Default**: 1 |
 | <code>pageSize?</code> | <code>number</code> | -<br>**Default**: 5 |
 | <code>order?</code> | <code>[DataDictionaryV1PaginationOrder](src/models/data-dictionary-v1-pagination-order.ts)</code> | - |
-| <code>orderBy?</code> | <code>string</code> | -<br>**Default**: "TIME_CREATED" |
+| <code>orderBy?</code> | <code>string</code> | -<br>**Default**: "FROM_STAGE_TIME_CREATED" |
 | <code>arn?</code> | <code>string</code> | - |
 | <code>brand?</code> | <code>[BrandAuthenticationsPaymentMethodCardBrand](src/models/brand-authentications-payment-method-card-brand.ts)</code> | - |
 | <code>status?</code> | <code>[StatusDisputesStatus](src/models/status-disputes-status.ts)</code> | - |
@@ -7603,7 +7603,7 @@ try {
     page: 1,
     pageSize: 5,
     order: DataDictionaryV1PaginationOrder.Asc,
-    orderBy: "TIME_CREATED",
+    orderBy: "FROM_STAGE_TIME_CREATED",
     brand: BrandAuthenticationsPaymentMethodCardBrand.Visa,
     status: StatusSettlementDisputesStatus.Funded,
     stage: StageSettlementDisputesStage.Retrieval,
@@ -7636,7 +7636,7 @@ const result = await client.settlementReporting
     page: 1,
     pageSize: 5,
     order: DataDictionaryV1PaginationOrder.Asc,
-    orderBy: "TIME_CREATED",
+    orderBy: "FROM_STAGE_TIME_CREATED",
     brand: BrandAuthenticationsPaymentMethodCardBrand.Visa,
     status: StatusSettlementDisputesStatus.Funded,
     stage: StageSettlementDisputesStage.Retrieval,
@@ -7671,7 +7671,7 @@ if (result.ok) {
 | <code>page?</code> | <code>number</code> | -<br>**Default**: 1 |
 | <code>pageSize?</code> | <code>number</code> | -<br>**Default**: 5 |
 | <code>order?</code> | <code>[DataDictionaryV1PaginationOrder](src/models/data-dictionary-v1-pagination-order.ts)</code> | - |
-| <code>orderBy?</code> | <code>string</code> | -<br>**Default**: "TIME_CREATED" |
+| <code>orderBy?</code> | <code>string</code> | -<br>**Default**: "FROM_STAGE_TIME_CREATED" |
 | <code>arn?</code> | <code>string</code> | - |
 | <code>brand?</code> | <code>[BrandAuthenticationsPaymentMethodCardBrand](src/models/brand-authentications-payment-method-card-brand.ts)</code> | - |
 | <code>status?</code> | <code>[StatusSettlementDisputesStatus](src/models/status-settlement-disputes-status.ts)</code> | - |
